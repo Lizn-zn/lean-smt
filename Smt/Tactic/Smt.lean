@@ -171,8 +171,8 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   withProcessedHints hs fun hs => do
   -- 2. Generate the SMT query.
   let cmds ← prepareSmtQuery hs
-  -- let cmds := .checkSat :: cmds
-  -- let cmds := .getModel :: cmds
+  let cmds := .checkSat :: cmds
+  let cmds := .getModel :: cmds
   let query := addCommands cmds.reverse *> checkSat
   logInfo m!"goal: {goalType}"
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
@@ -220,7 +220,6 @@ where
   withProcessedHints hs fun hs => do
   let cmds ← prepareSmtQuery hs
   let cmds := .checkSat :: cmds
-  let cmds := .getModel :: cmds
   logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
 
 def elimDvd : TacticM Unit := do
