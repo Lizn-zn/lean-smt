@@ -286,13 +286,13 @@ def smtSolve : TacticM Unit := withMainContext do
     -- 4. Print the result.
     logInfo m!"\n{res}"
     match res with
-    | .sat msg =>
       -- 4a. Print model.
-      throwError "unable to prove goal, either it is false or you need to define more symbols with `smt [foo, bar]`"
+
+    | .sat msg     => throwError s!"counter example exists: {msg}"
     | .unknown msg => throwError "unable to prove goal"
-    | .timeout msg => throwError "the SMT solver timed out"
-    | .except msg => throwError "solver exception"
-    | .unsat msg => closeWithAxiom
+    | .timeout msg => throwError "the solver timed out"
+    | .except msg  => throwError s!"solver exception {msg}"
+    | .unsat msg   => closeWithAxiom
 
 syntax "smt_preprocess" : tactic
 syntax "smt!" : tactic
