@@ -176,14 +176,15 @@ def checkSat : SolverT m Result := do
   let (_, proc) ← proc.takeStdin
   let _ ← proc.wait
 
+  let res := (← proc.stdout.readToEnd).trim
   let msg := (← proc.stderr.readToEnd).trim
 
-  match (← proc.stdout.readToEnd).trim with
+  match res with
   | "sat"     => return (.sat msg)
   | "unsat"   => return (.unsat msg)
   | "unknown" => return (.unknown msg)
   | "timeout" => return (.timeout msg)
   | "except"  => return (.except msg)
-  | out => (throw (IO.userError s!"unexpected solver output\nstdout: {(← proc.stdout.readToEnd)}\nstderr: {msg}") : IO _)
+  | out => (throw (IO.userError s!"unexpected solver output\nstdout: {res}\nstderr: {msg}") : IO _)
 
 end Smt.Solver
