@@ -172,7 +172,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   -- 2. Generate the SMT query.
   let cmds ← prepareSmtQuery hs
   -- let cmds := .checkSat :: cmds
-  let cmds := .getModel :: cmds
+  -- let cmds := .getModel :: cmds
   let query := addCommands cmds.reverse *> checkSat
   logInfo m!"goal: {goalType}"
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
@@ -186,10 +186,10 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   | .sat msg =>
     -- 4a. Print model.
     throwError s!"counter example exists: {msg}"
-  | .unknown msg => throwError "unable to prove goal"
-  | .timeout msg => throwError "the solver timed out"
+  | .unknown _ => throwError "unable to prove goal"
+  | .timeout _ => throwError "the solver timed out"
   | .except msg => throwError s!"solver exception {msg}"
-  | .unsat msg => return ()
+  | .unsat _ => return ()
   /-
   try
     -- 4b. Reconstruct proof.
@@ -293,10 +293,10 @@ def smtSolve : TacticM Unit := withMainContext do
     match res with
       -- 4a. Print model.
     | .sat msg     => throwError s!"counter example exists: {msg}"
-    | .unknown msg => throwError "unable to prove goal"
-    | .timeout msg => throwError "the solver timed out"
+    | .unknown _   => throwError "unable to prove goal"
+    | .timeout _   => throwError "the solver timed out"
     | .except msg  => throwError s!"solver exception {msg}"
-    | .unsat msg   => closeWithAxiom
+    | .unsat _     => closeWithAxiom
 
 syntax "smt_preprocess" : tactic
 syntax "smt!" : tactic
