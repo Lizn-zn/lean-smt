@@ -143,7 +143,7 @@ def checkSat : SolverT m Result := do
     args := args.push $ state.args[kind].get!.foldl (fun r s => r ++ " " ++ s) ""
 
   let proc ← IO.Process.spawn {
-    cmd := "smt-portfolio"
+    cmd := "mtsolve"
     args := args
     stdin := .piped
     stdout := .piped
