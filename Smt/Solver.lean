@@ -152,7 +152,7 @@ def defineFunRec (id : String) (ps : List (String × Term)) (s : Term) (t : Term
 def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
-def checkSat : SolverT m (Result, String) := do
+def checkSat : SolverT m Result := do
   addCommand .checkSat
   let state ← get
 
