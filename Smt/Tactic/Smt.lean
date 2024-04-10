@@ -177,7 +177,6 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
   let ss ← create timeout.get!
-  logInfo s!"{ss}"
   let res ← StateT.run' query ss
   -- 4. Print the result.
   logInfo m!"result: {res}"
