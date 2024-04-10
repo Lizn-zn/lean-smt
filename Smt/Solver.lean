@@ -103,17 +103,17 @@ def addCommand (c : Command) : SolverT m Unit := do
 
 def addCommands : List Command → SolverT m Unit := (List.forM · addCommand)
 
--- /-- Create an instance of a pre-configured SMT solver. -/
--- def create (timeoutSecs : Nat) : IO SolverState := do
---   let args : HashMap Kind (Array String) := HashMap.ofList [
---     --(.boolector, #["--smt2", "--time", toString timeoutSecs]),
---     (.cvc5,      #["--quiet", "--incremental", "--lang", "smt", "--dag-thresh=0", "--enum-inst", "--tlimit", toString (1000 * timeoutSecs)]),
---     (.vampire,   #["--input_syntax", "smtlib2", "--output_mode", "smtcomp", "--time_limit", toString timeoutSecs]),
---     --(.yices,     #["--timeout", toString timeoutSecs]),
---     (.z3,        #["-smt2", s!"-T:{timeoutSecs}"])
---     s!"--timeout {timeoutSecs}"
---   ]
---   return ⟨[], args⟩
+/-- Create an instance of a pre-configured SMT solver. -/
+def create (timeoutSecs : Nat) : IO SolverState := do
+  let args : HashMap Kind (Array String) := HashMap.ofList [
+    --(.boolector, #["--smt2", "--time", toString timeoutSecs]),
+    -- (.cvc5,      #["--quiet", "--incremental", "--lang", "smt", "--dag-thresh=0", "--enum-inst", "--tlimit", toString (1000 * timeoutSecs)]),
+    -- (.vampire,   #["--input_syntax", "smtlib2", "--output_mode", "smtcomp", "--time_limit", toString timeoutSecs]),
+    --(.yices,     #["--timeout", toString timeoutSecs]),
+    -- (.z3,        #["-smt2", s!"-T:{timeoutSecs}"])
+    s!"--timeout {timeoutSecs}"
+  ]
+  return ⟨[], args⟩
 
 /-- Set the SMT query logic to `l`. -/
 def setLogic (l : String) : SolverT m Unit := addCommand (.setLogic l)
