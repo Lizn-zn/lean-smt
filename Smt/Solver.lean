@@ -69,20 +69,21 @@ def Kind.toDefaultPath : Kind → String
 
 /-- Result of an SMT query. -/
 inductive Result where
-  | sat     : Result
-  | unsat   : Result
-  | unknown : Result
-  | timeout : Result
-  | except  : Result
+  | sat     : String → Result
+  | unsat   : String → Result
+  | unknown : String → Result
+  | timeout : String → Result
+  | except  : String → Result
 deriving DecidableEq, Inhabited
 
 instance : ToString Result where
   toString : Result → String
-    | .sat     => "sat"
-    | .unsat   => "unsat"
-    | .unknown => "unknown"
-    | .timeout => "timeout"
-    | .except  => "except"
+    | .sat msg     => "sat: " ++ msg
+    | .unsat msg   => "unsat: " ++ msg
+    | .unknown msg => "unknown: " ++ msg
+    | .timeout msg => "timeout: " ++ msg
+    | .except msg  => "except: " ++ msg
+
 
 /-- The data-structure for the state of the generic SMT-LIB solver. -/
 structure SolverState where
@@ -152,7 +153,7 @@ def defineFunRec (id : String) (ps : List (String × Term)) (s : Term) (t : Term
 def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
-def checkSat : SolverT m (Result, String) := do
+def checkSat : SolverT m Result := do
   addCommand .checkSat
   let state ← get
 
@@ -181,11 +182,12 @@ def checkSat : SolverT m (Result, String) := do
   let msg := msg.trim
 
   match (← proc.stdout.readToEnd).trim with
-  | "sat"     => return (.sat, msg)
-  | "unsat"   => return (.unsat, msg)
-  | "unknown" => return (.unknown, msg)
-  | "timeout" => return (.timeout, msg)
-  | "except"  => return (.except, msg)
+  | "sat"     => return .sat msg
+  | "unsat"   => return .unsat msg
+  | "unknown" => return .unknown msg
+  | "timeout" => return .timeout msg
+  | "except"  => return .except msg
   | out => throw (IO.userError s!"unexpected solver output\nstdout: {out}\nstderr: {msg}")
+
 
 end Smt.Solver
