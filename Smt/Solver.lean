@@ -180,10 +180,6 @@ def checkSat : SolverT m Result := do
 
   match (← proc.stdout.readToEnd).trim with
   | "sat"     => return (.sat msg)
-  | "unsat"   => return (.unsat msg)
-  | "unknown" => return (.unknown msg)
-  | "timeout" => return (.timeout msg)
-  | "except"  => return (.except msg)
   | out => (throw (IO.userError s!"unexpected solver output\nstdout: {out}\nstderr:{← proc.stderr.readToEnd}") : IO _)
 
 end Smt.Solver
