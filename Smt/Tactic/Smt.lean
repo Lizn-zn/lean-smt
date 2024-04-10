@@ -173,7 +173,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   let cmds ← prepareSmtQuery hs
   let query := addCommands cmds.reverse *> checkSat
   logInfo m!"goal: {goalType}"
-  logInfo m!"query:\n{Command.cmdsAsQuery (.checkSat .getModel :: cmds)}"
+  logInfo m!"query:\n{Command.cmdsAsQuery (.checkSat :: cmds) (.getModel :: cmds)}"
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
   let ss ← create timeout.get!
