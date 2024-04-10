@@ -184,6 +184,6 @@ def checkSat : SolverT m Result := do
   | "unknown" => return (.unknown msg)
   | "timeout" => return (.timeout msg)
   | "except"  => return (.except msg)
-  | out => (throw (IO.userError s!"???unexpected solver output\nstdout: {out}\nstderr:{← proc.stderr.readToEnd}") : IO _)
+  | out => (throw (IO.userError s!"unexpected solver output\nstdout: {(← proc.stdout.readToEnd)}\nstderr:{← proc.stderr.readToEnd}") : IO _)
 
 end Smt.Solver
