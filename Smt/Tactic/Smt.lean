@@ -177,7 +177,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
   let ss ← create timeout.get!
-  let res ← StateT.run' query ss
+  let (res, msg) ← StateT.run' query ss
   -- 4. Print the result.
   logInfo m!"\nresult: {res}"
   match res with
@@ -284,7 +284,7 @@ def smtSolve : TacticM Unit := withMainContext do
     let ss ← create timeout.get!
     let res ← StateT.run' query ss
     -- 4. Print the result.
-    logInfo m!"\nresult: {res}"
+    logInfo m!"\n{res}"
     match res with
     | .sat =>
       -- 4a. Print model.

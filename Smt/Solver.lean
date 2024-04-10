@@ -151,8 +151,16 @@ def defineFunRec (id : String) (ps : List (String × Term)) (s : Term) (t : Term
 /-- Assert that proposition `t` is true. -/
 def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
+/-- Extract Info from the result like 'result: unsat | msg: no counter example exists' -/
+def extractInfo (s : String) : (String, String) := do
+  let seq := "|||"
+  let idx := s.posOf seq -- this is split notation
+  let res := s.take idx
+  let msg := s.take (idx + seq.length)
+  return (res, msg)
+
 /-- Check if the query given so far is satisfiable and return the result. -/
-def checkSat : SolverT m Result := do
+def checkSat : SolverT m (Result, String) := do
   addCommand .checkSat
   let state ← get
 
@@ -177,11 +185,15 @@ def checkSat : SolverT m Result := do
   let (_, proc) ← proc.takeStdin
   let _ ← proc.wait
 
-  match (← proc.stdout.readToEnd).trim with
-  | "sat"     => return .sat
-  | "unsat"   => return .unsat
-  | "unknown" => return .unknown
-  | "timeout" => return .timeout
+  let output := (← proc.stdout.readToEnd).trim
+  let (res, msg) := extractInfo output
+
+  match res with
+  | "sat"     => return (.sat, msg)
+  | "unsat"   => return (.unsat, msg)
+  | "unknown" => return (.unknown, msg)
+  | "timeout" => return (.timeout, msg)
+  | "except"  => return (.except, msg)
   | out => (throw (IO.userError s!"unexpected solver output\nstdout: {out}\nstderr:{← proc.stderr.readToEnd}") : IO _)
 
 end Smt.Solver
