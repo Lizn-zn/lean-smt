@@ -67,13 +67,12 @@ def Kind.toDefaultPath : Kind → String
   --| .yices => "yices-smt2"
   | k      => toString k
 
-/-- Result of an SMT query. -/
 inductive Result where
-  | sat     : String → Result
-  | unsat   : String → Result
+  | sat : String → Result
+  | unsat : String → Result
   | unknown : String → Result
   | timeout : String → Result
-  | except  : String → Result
+  | except : String → Result
 deriving DecidableEq, Inhabited
 
 instance : ToString Result where
@@ -83,7 +82,6 @@ instance : ToString Result where
     | .unknown msg => "unknown: " ++ msg
     | .timeout msg => "timeout: " ++ msg
     | .except msg  => "except: " ++ msg
-
 
 /-- The data-structure for the state of the generic SMT-LIB solver. -/
 structure SolverState where
@@ -178,8 +176,6 @@ def checkSat : SolverT m Result := do
   let (_, proc) ← proc.takeStdin
   let _ ← proc.wait
 
-  let msg ← proc.stderr.readToEnd
-  let msg := msg.trim
   let msg := "1"
 
   match (← proc.stdout.readToEnd).trim with
