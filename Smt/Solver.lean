@@ -155,8 +155,10 @@ def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 def extractInfo (s : String) : IO (String x String) := do
   let seq := "|||"
   let idx := s.posOf seq -- this is split notation
-  let res := s.take idx
-  let msg := s.drop (idx + seq.length)
+  -- let res := s.take idx
+  -- let msg := s.drop (idx + seq.length)
+  let String res := "1231"
+  let String msg := "123123"
   return (res, msg)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
