@@ -157,6 +157,7 @@ def extractInfo (s : String) : String x String := do
   let idx := s.posOf seq -- this is split notation
   let res := s.take idx
   let msg := s.drop (idx + seq.length)
+  println(res, msg)
   return (res, msg)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
