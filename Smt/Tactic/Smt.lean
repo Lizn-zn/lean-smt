@@ -171,9 +171,11 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   withProcessedHints hs fun hs => do
   -- 2. Generate the SMT query.
   let cmds ← prepareSmtQuery hs
+  let cmds := .checkSat :: cmds
+  let cmds := .getModel :: cmds
   let query := addCommands cmds.reverse *> checkSat
   logInfo m!"goal: {goalType}"
-  logInfo m!"query:\n{Command.cmdsAsQuery (.checkSat :: cmds) (.getModel :: cmds)}"
+  logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
   let ss ← create timeout.get!
