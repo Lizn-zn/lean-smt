@@ -152,7 +152,7 @@ def defineFunRec (id : String) (ps : List (String × Term)) (s : Term) (t : Term
 def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
-def checkSat : SolverT m Result := do
+def checkSat : SolverT m (Result, String) := do
   addCommand .checkSat
   let state ← get
 
@@ -181,11 +181,11 @@ def checkSat : SolverT m Result := do
   let msg := msg.trim
 
   match (← proc.stdout.readToEnd).trim with
-  | "sat"     => return .sat
-  | "unsat"   => return .unsat
-  | "unknown" => return .unknown
-  | "timeout" => return .timeout
-  | "except"  => return .except
+  | "sat"     => return (.sat, msg)
+  | "unsat"   => return (.unsat, msg)
+  | "unknown" => return (.unknown, msg)
+  | "timeout" => return (.timeout, msg)
+  | "except"  => return (.except, msg)
   | out => (throw (IO.userError s!"unexpected solver output\nstdout: {out}\nstderr:{← proc.stderr.readToEnd}") : IO _)
 
 end Smt.Solver
