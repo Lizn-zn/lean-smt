@@ -186,7 +186,7 @@ def checkSat : SolverT m (Result x String) := do
   let _ ← proc.wait
 
   let output ← proc.stdout.readToEnd
-  let (res, msg) := extractInfo output.trim
+  let (res, msg) := extractInfo output
 
   match res with
   | "sat"     => return (.sat, msg)
