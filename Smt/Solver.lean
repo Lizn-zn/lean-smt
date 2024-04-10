@@ -107,11 +107,13 @@ def addCommands : List Command → SolverT m Unit := (List.forM · addCommand)
 def create (timeoutSecs : Nat) : IO SolverState := do
   let args : HashMap Kind (Array String) := HashMap.ofList [
     --(.boolector, #["--smt2", "--time", toString timeoutSecs]),
-    -- (.cvc5,      #["--quiet", "--incremental", "--lang", "smt", "--dag-thresh=0", "--enum-inst", "--tlimit", toString (1000 * timeoutSecs)]),
+    (.cvc5,      #["--timeout", toString timeoutSecs]),
     -- (.vampire,   #["--input_syntax", "smtlib2", "--output_mode", "smtcomp", "--time_limit", toString timeoutSecs]),
     --(.yices,     #["--timeout", toString timeoutSecs]),
-    -- (.z3,        #["-smt2", s!"-T:{timeoutSecs}"])
-    s!"--timeout {timeoutSecs}"
+    (.z3,        #["--timeout", toString timeoutSecs]),
+    (.sysol      #["--timeout", toString timeoutSecs]),
+    (.syopt      #["--timeout", toString timeoutSecs]),
+    (.bottema    #["--timeout", toString timeoutSecs]),
   ]
   return ⟨[], args⟩
 
