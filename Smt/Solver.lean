@@ -152,11 +152,11 @@ def defineFunRec (id : String) (ps : List (String × Term)) (s : Term) (t : Term
 def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
 /-- Extract Info from the result like 'result: unsat | msg: no counter example exists' -/
-def extractInfo : (s : String) (String x String) := do
+def extractInfo : (s : String) (String, String) := do
   let seq := "|||"
   let idx := s.posOf seq -- this is split notation
   let res := s.take idx
-  let msg := s.take (idx + seq.length)
+  let msg := s.drop (idx + seq.length)
   return (res, msg)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
