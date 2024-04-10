@@ -176,8 +176,8 @@ def checkSat : SolverT m Result := do
   let (_, proc) ← proc.takeStdin
   let _ ← proc.wait
 
-  -- let msg := (← proc.stderr.readToEnd).trim
-  let msg := "11111"
+  let msg := (← proc.stderr.readToEnd).trim
+  -- let msg := "11111"
 
   match (← proc.stdout.readToEnd).trim with
   | "sat"     => return (.sat msg)
