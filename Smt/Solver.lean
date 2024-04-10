@@ -77,11 +77,11 @@ deriving DecidableEq, Inhabited
 
 instance : ToString Result where
   toString : Result → String
-    | .sat msg     => "sat: " ++ msg
-    | .unsat msg   => "unsat: " ++ msg
-    | .unknown msg => "unknown: " ++ msg
-    | .timeout msg => "timeout: " ++ msg
-    | .except msg  => "except: " ++ msg
+    | .sat msg     => "sat. " ++ msg
+    | .unsat msg   => "unsat. " ++ msg
+    | .unknown msg => "unknown. " ++ msg
+    | .timeout msg => "timeout. " ++ msg
+    | .except msg  => "except. " ++ msg
 
 /-- The data-structure for the state of the generic SMT-LIB solver. -/
 structure SolverState where
