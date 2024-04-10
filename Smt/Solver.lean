@@ -153,12 +153,13 @@ def assert (t : Term) : SolverT m Unit := addCommand (.assert t)
 
 /-- Extract Info from the result like 'result: unsat | msg: no counter example exists' -/
 def extractInfo (s : String) : IO (String x String) := do
-  let String seq := "|||"
+  let seq := "|||"
+  let s := "123123123 ||| 1231231"
   let idx := s.posOf seq -- this is split notation
   -- let res := s.take idx
   -- let msg := s.drop (idx + seq.length)
-  let String res := "1231"
-  let String msg := "123123"
+  let res := "1231"
+  let msg := "123123"
   return (res, msg)
 
 /-- Check if the query given so far is satisfiable and return the result. -/
