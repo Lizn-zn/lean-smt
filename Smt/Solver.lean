@@ -144,7 +144,8 @@ def checkSat : SolverT m Result := do
 
   let proc ← IO.Process.spawn {
     cmd := "mtsolve"
-    args := args
+    -- args := args
+    args := ""
     stdin := .piped
     stdout := .piped
     stderr := .piped
