@@ -287,7 +287,6 @@ def smtSolve : TacticM Unit := withMainContext do
     logInfo m!"\n{res}"
     match res with
       -- 4a. Print model.
-
     | .sat msg     => throwError s!"counter example exists: {msg}"
     | .unknown msg => throwError "unable to prove goal"
     | .timeout msg => throwError "the solver timed out"
