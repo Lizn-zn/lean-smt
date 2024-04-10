@@ -111,9 +111,9 @@ def create (timeoutSecs : Nat) : IO SolverState := do
     -- (.vampire,   #["--input_syntax", "smtlib2", "--output_mode", "smtcomp", "--time_limit", toString timeoutSecs]),
     --(.yices,     #["--timeout", toString timeoutSecs]),
     (.z3,        #["--timeout", toString timeoutSecs]),
-    (.sysol      #["--timeout", toString timeoutSecs]),
-    (.syopt      #["--timeout", toString timeoutSecs]),
-    (.bottema    #["--timeout", toString timeoutSecs]),
+    (.sysol,     #["--timeout", toString timeoutSecs]),
+    (.syopt,     #["--timeout", toString timeoutSecs]),
+    (.bottema,   #["--timeout", toString timeoutSecs]),
   ]
   return ⟨[], args⟩
 
