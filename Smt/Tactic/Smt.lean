@@ -181,13 +181,13 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   -- 4. Print the result.
   logInfo m!"\nresult: {res}"
   match res with
-  | .sat =>
+  | .sat msg =>
     -- 4a. Print model.
     throwError "unable to prove goal, either it is false or you need to define more symbols with `smt [foo, bar]`"
-  | .unknown => throwError "unable to prove goal"
-  | .timeout => throwError "the SMT solver timed out"
-  | .except  => throwError "solver exception"
-  | .unsat => return ()
+  | .unknown msg => throwError "unable to prove goal"
+  | .timeout msg => throwError "the SMT solver timed out"
+  | .except msg => throwError "solver exception"
+  | .unsat msg => return ()
   /-
   try
     -- 4b. Reconstruct proof.
