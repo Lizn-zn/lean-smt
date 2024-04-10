@@ -220,6 +220,7 @@ where
   withProcessedHints hs fun hs => do
   let cmds ← prepareSmtQuery hs
   let cmds := .checkSat :: cmds
+  let cmds := .getModel :: cmds
   logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
 
 def elimDvd : TacticM Unit := do
@@ -278,9 +279,11 @@ def smtSolve : TacticM Unit := withMainContext do
   withProcessedHints hs fun hs => do
     -- 2. Generate the SMT query.
     let cmds ← prepareSmtQuery hs
+    let cmds := .checkSat :: cmds
+    let cmds := .getModel :: cmds
     let query := addCommands cmds.reverse *> checkSat
     logInfo m!"goal: {goalType}"
-    logInfo m!"\nquery:\n{Command.cmdsAsQuery (.checkSat :: cmds)}"
+    logInfo m!"\nquery:\n{Command.cmdsAsQuery cmds}"
     -- 3. Run the solver.
     let timeout := some 10
     let ss ← create timeout.get!
