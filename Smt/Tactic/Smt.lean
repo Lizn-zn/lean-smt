@@ -186,6 +186,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
     throwError "unable to prove goal, either it is false or you need to define more symbols with `smt [foo, bar]`"
   | .unknown => throwError "unable to prove goal"
   | .timeout => throwError "the SMT solver timed out"
+  | .except  => throwError "solver exception"
   | .unsat => return ()
   /-
   try
