@@ -179,7 +179,7 @@ def checkSat : SolverT m Result := do
   let msg := "1"
 
   match (← proc.stdout.readToEnd).trim with
-  | "sat"     => return .sat
+  | "sat"     => return (.sat "sat")
   | "unsat"   => return .unsat
   | "unknown" => return .unknown
   | "timeout" => return .timeout
