@@ -171,7 +171,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   withProcessedHints hs fun hs => do
   -- 2. Generate the SMT query.
   let cmds ← prepareSmtQuery hs
-  let cmds := .checkSat :: cmds
+  -- let cmds := .checkSat :: cmds
   let cmds := .getModel :: cmds
   let query := addCommands cmds.reverse *> checkSat
   logInfo m!"goal: {goalType}"
