@@ -131,37 +131,14 @@ private def addDeclToUnfoldOrTheorem (thms : Meta.SimpTheorems) (e : Expr) : Met
   else
     thms.add (.fvar e.fvarId!) #[] e
 
+axiom SMT_VERIF (P : Prop) : P
+
 /-
-open Reconstruction.Certifying in
-def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
-  let mvar' ← Smt.Util.rewriteIffMeta (← Tactic.getMainGoal)
-  replaceMainGoal [mvar']
-  let mut gs ← (← Tactic.getMainGoal).apply (mkApp (mkConst ``notNotElim) (← Tactic.getMainTarget))
-  Tactic.replaceMainGoal gs
-  let th ← Meta.mkConstWithFreshMVarLevels name
-  trace[smt.debug.reconstruct] "theorem {name} : {← Meta.inferType th}"
-  gs ← (← Tactic.getMainGoal).apply th
-  Tactic.replaceMainGoal gs
-  for h in hints do
-    evalAnyGoals do
-      let gs ← (← Tactic.getMainGoal).apply h
-      Tactic.replaceMainGoal gs
-  let mut some thms ← (← Meta.getSimpExtension? `smt_simp).mapM (·.getTheorems)
-    | throwError "smt tactic failed, 'smt_simp' simpset is not available"
-  -- TODO: replace with our abbreviation of `Implies`
-  thms ← thms.addDeclToUnfold ``Implies
-  for h in hints do
-    thms ← addDeclToUnfoldOrTheorem thms h
-  evalAnyGoals do
-    let (result?, _) ← Meta.simpGoal (← Tactic.getMainGoal) {
-      config := { { : Lean.Meta.Simp.Config } with failIfUnchanged := false }
-      simpTheorems := #[thms],
-      congrTheorems := (← Meta.getSimpCongrTheorems)
-    }
-    match result? with
-    | none => replaceMainGoal []
-    | some (_, mvarId) => replaceMainGoal [mvarId]
+  Close the current goal using the above axiom.
+  It is crucial to ensure that this is only invoked when an `unsat` result is returned
 -/
+def closeWithAxiom : TacticM Unit := do
+  let _ ← evalTactic (← `(tactic| apply SMT_VERIF))
 
 @[tactic smt] def evalSmt : Tactic := fun stx => withMainContext do
   let goalType ← Tactic.getMainTarget
@@ -189,7 +166,7 @@ def rconsProof (name : Name) (hints : List Expr) : TacticM Unit := do
   | .unknown _ => throwError "unable to prove goal"
   | .timeout _ => throwError "the solver timed out"
   | .except msg => throwError s!"solver exception {msg}"
-  | .unsat _ => return ()
+  | .unsat _ => closeWithAxiom
   /-
   try
     -- 4b. Reconstruct proof.
@@ -222,89 +199,13 @@ where
   let cmds := .checkSat :: cmds
   logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
 
-def elimDvd : TacticM Unit := do
-  return ()
+-- syntax "smt_preprocess" : tactic
+-- syntax "smt!" : tactic
 
-def elimPrime : TacticM Unit := do
-  return ()
-
-def elimLog : TacticM Unit := do
-  return ()
-
--- pow
-def elimSqrt : TacticM Unit := do
-  return ()
-
-def elimAbs : TacticM Unit := do
-  return ()
-
-def elimOddEven : TacticM Unit := do
-  return ()
-
-def smtPreprocess : TacticM Unit := do
-  logInfo "smtPreprocess"
-  elimDvd
-  elimPrime
-  elimLog
-  elimSqrt
-  elimAbs
-  elimOddEven
-
-def getLocalHypotheses : MetaM (List Expr) := do
-  let ctx ← getLCtx
-  let mut hs := #[]
-  for localDecl in ctx do
-    if localDecl.isImplementationDetail then
-      continue
-    let e ← instantiateMVars localDecl.toExpr
-    let et ← inferType e >>= instantiateMVars
-    if (← isProp et) then
-      hs := hs.push localDecl.toExpr
-  return hs.toList.eraseDups
-
-axiom SMT_VERIF (P : Prop) : P
-
-/-
-  Close the current goal using the above axiom.
-  It is crucial to ensure that this is only invoked when an `unsat` result is returned
--/
-def closeWithAxiom : TacticM Unit := do
-  let _ ← evalTactic (← `(tactic| apply SMT_VERIF))
-
-def smtSolve : TacticM Unit := withMainContext do
-  let goalType ← Tactic.getMainTarget
-  -- 1. Get the hints passed to the tactic.
-  let hs ← getLocalHypotheses
-  withProcessedHints hs fun hs => do
-    -- 2. Generate the SMT query.
-    let cmds ← prepareSmtQuery hs
-    let cmds := .checkSat :: cmds
-    let cmds := .getModel :: cmds
-    let query := addCommands cmds.reverse *> checkSat
-    logInfo m!"goal: {goalType}"
-    logInfo m!"\nquery:\n{Command.cmdsAsQuery cmds}"
-    -- 3. Run the solver.
-    let timeout := some 10
-    let ss ← create timeout.get!
-    let res ← StateT.run' query ss
-    -- 4. Print the result.
-    logInfo m!"\n{res}"
-    match res with
-      -- 4a. Print model.
-    | .sat msg     => throwError s!"counter example exists: {msg}"
-    | .unknown _   => throwError "unable to prove goal"
-    | .timeout _   => throwError "the solver timed out"
-    | .except msg  => throwError s!"solver exception {msg}"
-    | .unsat _     => closeWithAxiom
-
-syntax "smt_preprocess" : tactic
-syntax "smt!" : tactic
-
-elab_rules : tactic
-  | `(tactic | smt_preprocess) => smtPreprocess
-  | `(tactic | smt!) => do
-    smtPreprocess
-    smtSolve
-
+-- elab_rules : tactic
+--   | `(tactic | smt_preprocess) => smtPreprocess
+--   | `(tactic | smt!) => do
+--     smtPreprocess
+--     smtSolve
 
 end Smt
