@@ -163,9 +163,8 @@ def closeWithAxiom : TacticM Unit := do
   | .sat msg =>
     -- 4a. Print model.
     throwError s!"counter example exists: {msg}"
-  | .unknown _ => throwError "unable to prove goal"
+  | .unknown _ => throwError s!"unable to prove goal {msg}"
   | .timeout _ => throwError "the solver timed out"
-  | .except msg => throwError s!"solver exception {msg}"
   | .unsat _ => closeWithAxiom
   /-
   try
