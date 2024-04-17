@@ -71,6 +71,7 @@ inductive Result where
   | sat : String → Result
   | unsat : String → Result
   | unknown : String → Result
+  | except  : String → Result
   | timeout : String → Result
 deriving DecidableEq, Inhabited
 
@@ -79,6 +80,7 @@ instance : ToString Result where
     | .sat msg     => "sat. " ++ msg
     | .unsat msg   => "unsat. " ++ msg
     | .unknown msg => "unknown. " ++ msg
+    | .except msg  => "except. " ++ msg
     | .timeout msg => "timeout. " ++ msg
 
 /-- The data-structure for the state of the generic SMT-LIB solver. -/
@@ -181,6 +183,7 @@ def checkSat : SolverT m Result := do
   | "unsat"   => return (.unsat msg)
   | "unknown" => return (.unknown msg)
   | "timeout" => return (.timeout msg)
+  | "except"  => return (.except msg)
   | out => (throw (IO.userError s!"unexpected solver output\nstdout: {res}\nstderr: {msg}") : IO _)
 
 end Smt.Solver
