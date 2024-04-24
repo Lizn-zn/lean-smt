@@ -79,14 +79,13 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
 def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
   | `(smtSolver| (solver := $[$hs],*)) =>
       hs.toList.mapM (fun h =>
-        throwError s!"Invalid solver name 123 {h}")
-        -- match h.raw.getId.getString with
-        -- | "cvc5"    => throwError "Invalid solver name cvc5"
-        -- | "z3"      => return Kind.z3
-        -- | "bottema" => return Kind.bottema
-        -- | "sysol"   => return Kind.sysol
-        -- | "syopt"   => return Kind.syopt
-        -- | msg => throwError s!"Invalid solver name {msg}")
+        match h.raw.getId.getString with
+        | "cvc5"    => throwError "Invalid solver name cvc5"
+        | "z3"      => return Kind.z3
+        | "bottema" => return Kind.bottema
+        | "sysol"   => return Kind.sysol
+        | "syopt"   => return Kind.syopt
+        | msg => throwError s!"Invalid solver name {msg}")
   | `(smtSolver| ) => return [Kind.cvc5]
   | _ => throwUnsupportedSyntax
 
