@@ -159,7 +159,7 @@ def checkSat : SolverT m Result := do
   let mut args : Array String := #[]
 
   for kind in allKinds do
-    args := args.push s!"--{kind.toDefaultPath}"
+    -- args := args.push s!"--{kind.toDefaultPath}"
     args := args.push $ state.args[kind].get!.foldl (fun r s => r ++ " " ++ s) ""
 
   let proc ← IO.Process.spawn {
