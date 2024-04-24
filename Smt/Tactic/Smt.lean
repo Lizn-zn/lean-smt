@@ -59,9 +59,11 @@ The tactic then generates the query below:
 ```
 -/
 syntax (name := smt) "smt" smtHints smtTimeout : tactic
+syntax (name := smt!) "smt!" smtHints smtTimeout : tactic
 
 /-- Like `smt`, but just shows the query without invoking a solver. -/
 syntax (name := smtShow) "smt_show" smtHints : tactic
+syntax (name := smtShow!) "smt_show!" smtHints : tactic
 
 def parseHints : TSyntax `smtHints → TacticM (List Expr)
   | `(smtHints| [ $[$hs],* ]) => hs.toList.mapM (fun h => elabTerm h.raw none)
@@ -198,6 +200,53 @@ where
   let cmds ← prepareSmtQuery hs
   let cmds := .checkSat :: cmds
   logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
+
+def getLocalHypotheses : MetaM (List Expr) := do
+  let ctx ← getLCtx
+  let mut hs := #[]
+  for localDecl in ctx do
+    if localDecl.isImplementationDetail then
+      continue
+    let e ← instantiateMVars localDecl.toExpr
+    let et ← inferType e >>= instantiateMVars
+    if (← isProp et) then
+      hs := hs.push localDecl.toExpr
+  return hs.toList.eraseDups
+
+@[tactic smt!] def evalSmt! : Tactic := fun stx => withMainContext do
+  let goalType ← Tactic.getMainTarget
+  -- 1. Get the hints passed to the tactic.
+  let hs ← getLocalHypotheses
+  withProcessedHints hs fun hs => do
+    -- 2. Generate the SMT query.
+    let cmds ← prepareSmtQuery hs
+    let cmds := .checkSat :: cmds
+    let cmds := .getModel :: cmds
+    let query := addCommands cmds.reverse *> checkSat
+    logInfo m!"goal: {goalType}"
+    logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
+    -- 3. Run the solver.
+    let timeout ← parseTimeout ⟨stx[2]⟩
+    let ss ← create timeout.get!
+    let res ← StateT.run' query ss
+    -- 4. Print the result.
+    logInfo m!"result: {res}"
+    match res with
+    | .sat msg =>
+      -- 4a. Print model.
+      throwError s!"counter example exists: {msg}"
+    | .unknown msg => throwError s!"unable to prove goal {msg}"
+    | .except msg => throwError s!"solver exceptions {msg}"
+    | .timeout _ => throwError "the solver timed out"
+    | .unsat _ => closeWithAxiom
+
+@[tactic smtShow!] def evalSmtShow! : Tactic Unit := withMainContext do
+  let goalType ← Tactic.getMainTarget
+  let hs ← getLocalHypotheses
+  withProcessedHints hs fun hs => do
+    let cmds ← prepareSmtQuery hs
+    let cmds := .checkSat :: cmds
+    logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
 
 -- syntax "smt_preprocess" : tactic
 -- syntax "smt!" : tactic
