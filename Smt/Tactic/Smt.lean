@@ -242,7 +242,8 @@ def getLocalHypotheses : MetaM (List Expr) := do
     logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
     -- 3. Run the solver.
     let timeout ← parseTimeout ⟨stx[2]⟩
-    let ss ← create timeout.get!
+    let solvers ← parseSolver ⟨stx[3]⟩
+    let ss ← create timeout.get! solvers
     let res ← StateT.run' query ss
     -- 4. Print the result.
     logInfo m!"result: {res}"
