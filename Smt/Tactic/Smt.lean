@@ -28,6 +28,7 @@ initialize
 
 syntax smtHints := ("[" term,* "]")?
 syntax smtTimeout := ("(timeout := " num ")")?
+syntax smtSolver := ("[" term,* "]")?
 
 /-- `smt` converts the current goal into an SMT query and checks if it is
 satisfiable. By default, `smt` generates the minimum valid SMT query needed to
@@ -58,8 +59,8 @@ The tactic then generates the query below:
 (check-sat)
 ```
 -/
-syntax (name := smt) "smt" smtHints smtTimeout : tactic
-syntax (name := smt!) "smt!" smtHints smtTimeout : tactic
+syntax (name := smt) "smt" smtHints smtTimeout smtSolver : tactic
+syntax (name := smt!) "smt!" smtHints smtTimeout smtSolver : tactic
 
 /-- Like `smt`, but just shows the query without invoking a solver. -/
 syntax (name := smtShow) "smt_show" smtHints : tactic
@@ -73,6 +74,19 @@ def parseHints : TSyntax `smtHints → TacticM (List Expr)
 def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | `(smtTimeout| (timeout := $n)) => return some n.getNat
   | `(smtTimeout| ) => return some 5
+  | _ => throwUnsupportedSyntax
+
+def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
+  | `(smtSolver | [ $[$hs],* ]) =>
+      hs.toList.mapM (fun h =>
+        match h.raw.getId.getString with
+        | "cvc5"    => return Kind.cvc5
+        | "z3"      => return Kind.z3
+        | "bottema" => return Kind.bottema
+        | "sysol"   => return Kind.sysol
+        | "syopt"   => return Kind.syopt
+        | msg => throwError s!"Invalid solver name {msg}")
+  | `(smtSolver| ) => return [Kind.cvc5]
   | _ => throwUnsupportedSyntax
 
 def withProcessedHints (hs : List Expr) (k : List Expr → TacticM α): TacticM α :=
