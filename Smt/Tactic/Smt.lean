@@ -172,6 +172,7 @@ def closeWithAxiom : TacticM Unit := do
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
+  let solver ← parseSolver ⟨stx[3]⟩
   let ss ← create timeout.get!
   let res ← StateT.run' query ss
   -- 4. Print the result.
