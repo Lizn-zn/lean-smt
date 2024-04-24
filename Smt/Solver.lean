@@ -103,19 +103,21 @@ def addCommand (c : Command) : SolverT m Unit := do
 def addCommands : List Command → SolverT m Unit := (List.forM · addCommand)
 
 /-- Create an instance of a pre-configured SMT solver. -/
-def create (timeoutSecs : Nat) : IO SolverState := do
-  let args : HashMap Kind (Array String) := HashMap.ofList [
-    --(.boolector, #["--smt2", "--time", toString timeoutSecs]),
-    -- (.cvc5,      #["--timeout", toString timeoutSecs]), -- #["--quiet", "--incremental", "--lang", "smt", "--dag-thresh=0",
-                                                        -- "--produce-proofs", "--proof-granularity=theory-rewrite",
-                                                        -- "--proof-format=lean", "--enum-inst"]
+def create (timeoutSecs : Nat) (solvers : List Kind): IO SolverState := do
+  let allArgs : HashMap Kind (Array String) := HashMap.ofList [
+    (.cvc5,      #["--timeout", toString timeoutSecs]),
     -- (.vampire,   #["--input_syntax", "smtlib2", "--output_mode", "smtcomp", "--time_limit", toString timeoutSecs]),
     --(.yices,     #["--timeout", toString timeoutSecs]),
-    (.z3,        #["--timeout", toString timeoutSecs]), -- #["-in", "-smt2"]
-    -- (.sysol,     #["--timeout", toString timeoutSecs]),
-    -- (.syopt,     #["--timeout", toString timeoutSecs]),
-    -- (.bottema,   #["--timeout", toString timeoutSecs]),
+    (.z3,        #["--timeout", toString timeoutSecs]),
+    (.sysol,     #["--timeout", toString timeoutSecs]),
+    (.syopt,     #["--timeout", toString timeoutSecs]),
+    (.bottema,   #["--timeout", toString timeoutSecs]),
   ]
+  let args := solvers.foldl (fun acc solver =>
+    match allArgs.find? solver with
+    | some args => acc.insert solver args
+    | none => acc
+  ) HashMap.empty
   return ⟨[], args⟩
 
 /-- Set the SMT query logic to `l`. -/
@@ -157,8 +159,12 @@ def checkSat : SolverT m Result := do
   let mut args : Array String := #[]
 
   for kind in allKinds do
-    args := args.push s!"--{kind.toDefaultPath}"
-    args := args.push $ state.args[kind].get!.foldl (fun r s => r ++ " " ++ s) ""
+    match state.args.find? kind with
+    | some argArray =>
+        args := args.push s!"--{kind.toDefaultPath}"
+        let combinedArgs := argArray.foldl (fun r s => r ++ " " ++ s) ""
+        args := args.push combinedArgs
+    | none => continue
 
   let proc ← IO.Process.spawn {
     cmd := "mtsolve"
@@ -184,6 +190,6 @@ def checkSat : SolverT m Result := do
   | "unknown" => return (.unknown msg)
   | "timeout" => return (.timeout msg)
   | "except"  => return (.except msg)
-  | out => (throw (IO.userError s!"unexpected solver output\nstdout: {res}\nstderr: {msg}") : IO _)
+  | _ => (throw (IO.userError s!"unexpected solver output\nstdout: {res}\nstderr: {msg}") : IO _)
 
 end Smt.Solver
