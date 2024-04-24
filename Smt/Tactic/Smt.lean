@@ -77,7 +77,7 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | _ => throwUnsupportedSyntax
 
 def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
-  | `(smtSolver| (solver := [$[$hs],*])) =>
+  | `(smtSolver| (solver := $[$hs],*)) =>
       hs.toList.mapM (fun h =>
         throwError s!"Invalid solver name 123 {h}")
         -- match h.raw.getId.getString with
