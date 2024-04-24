@@ -28,7 +28,7 @@ initialize
 
 syntax smtHints := ("[" term,* "]")?
 syntax smtTimeout := ("(timeout := " num ")")?
-syntax smtSolver := ("(solver:= " term,* ")")?
+syntax smtSolver := ("(solver :=" term,* ")")?
 
 /-- `smt` converts the current goal into an SMT query and checks if it is
 satisfiable. By default, `smt` generates the minimum valid SMT query needed to
@@ -77,7 +77,7 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | _ => throwUnsupportedSyntax
 
 def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
-  | `(smtSolver | [ $[$hs],* ]) =>
+  | `(smtSolver | (solver := [$[$hs],*])) =>
       hs.toList.mapM (fun h =>
         match h.raw.getId.getString with
         | "cvc5"    => return Kind.cvc5
