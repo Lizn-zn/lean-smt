@@ -28,7 +28,7 @@ initialize
 
 syntax smtHints := ("[" term,* "]")?
 syntax smtTimeout := ("(timeout := " num ")")?
-syntax smtSolver := ("[" term,* "]")?
+syntax smtSolver := ("(solver:= " term,* ")")?
 
 /-- `smt` converts the current goal into an SMT query and checks if it is
 satisfiable. By default, `smt` generates the minimum valid SMT query needed to
