@@ -80,13 +80,13 @@ def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
   | `(smtSolver| (solver := $[$hs],*)) =>
       hs.toList.mapM (fun h =>
         match h.raw.getId.getString with
-        | "cvc5"    => throwError "Invalid solver name cvc5"
+        | "cvc5"    => return Kind.cvc5
         | "z3"      => return Kind.z3
         | "bottema" => return Kind.bottema
         | "sysol"   => return Kind.sysol
         | "syopt"   => return Kind.syopt
         | msg => throwError s!"Invalid solver name {msg}")
-  | `(smtSolver| ) => return [Kind.cvc5]
+  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.bottema, Kind.sysol, Kind.syopt]
   | _ => throwUnsupportedSyntax
 
 def withProcessedHints (hs : List Expr) (k : List Expr → TacticM α): TacticM α :=
@@ -171,8 +171,8 @@ def closeWithAxiom : TacticM Unit := do
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
   -- 3. Run the solver.
   let timeout ← parseTimeout ⟨stx[2]⟩
-  let solver ← parseSolver ⟨stx[3]⟩
-  let ss ← create timeout.get!
+  let solvers ← parseSolver ⟨stx[3]⟩
+  let ss ← create timeout.get! solvers
   let res ← StateT.run' query ss
   -- 4. Print the result.
   logInfo m!"result: {res}"
