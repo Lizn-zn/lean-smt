@@ -240,7 +240,7 @@ def getLocalHypotheses : MetaM (List Expr) := do
     | .timeout _ => throwError "the solver timed out"
     | .unsat _ => closeWithAxiom
 
-@[tactic smtShow!] def evalSmtShow! : Tactic Unit := withMainContext do
+@[tactic smtShow!] def evalSmtShow! := withMainContext do
   let goalType ← Tactic.getMainTarget
   let hs ← getLocalHypotheses
   withProcessedHints hs fun hs => do
