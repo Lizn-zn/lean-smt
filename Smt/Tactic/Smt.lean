@@ -63,7 +63,7 @@ syntax (name := smt!) "smt!" smtHints smtTimeout : tactic
 
 /-- Like `smt`, but just shows the query without invoking a solver. -/
 syntax (name := smtShow) "smt_show" smtHints : tactic
-syntax (name := smtShow!) "smt_show!" smtHints : tactic
+syntax (name := smtShow!) "smt_show!" : tactic
 
 def parseHints : TSyntax `smtHints → TacticM (List Expr)
   | `(smtHints| [ $[$hs],* ]) => hs.toList.mapM (fun h => elabTerm h.raw none)
