@@ -77,10 +77,10 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | _ => throwUnsupportedSyntax
 
 def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
-  | `(smtSolver | (solver := [$[$hs],*])) =>
+  | `(smtSolver| (solver := [$[$hs],*])) =>
       hs.toList.mapM (fun h =>
         match h.raw.getId.getString with
-        | "cvc5"    => return Kind.cvc5
+        | "cvc5"    => throwError "Invalid solver name cvc5"
         | "z3"      => return Kind.z3
         | "bottema" => return Kind.bottema
         | "sysol"   => return Kind.sysol
