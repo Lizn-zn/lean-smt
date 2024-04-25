@@ -26,8 +26,8 @@ open Translator Term
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "div")  _ => return symbolT "div"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "lt")  _  => return symbolT "<"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "blt") _ => return symbolT "<"
-  | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "le") _ => return symbolT "<="
-  | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Sqrt 0) "Real") "sqrt")  _ => return symbolT "sqrt"
+  | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "le") _ => return symbolT "<=111"
+  -- | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Sqrt 0) "Real") "sqrt")  _ => return symbolT "sqrt"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "one") _ => return literalT "1"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "zero") _ => return literalT "0"
   | app (const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "inv'") _)  x => do return Term.mkApp2 (symbolT "/") (literalT "1") (← applyTranslators! x)
