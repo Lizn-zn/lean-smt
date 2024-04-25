@@ -8,6 +8,7 @@ Authors: Kaiyu Yang
 import Lean
 import Smt.Translator
 import Mathlib.Data.Real.Basic
+import Mathlib.Data.Real.Sqrt
 -- import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 namespace Smt.Real
@@ -26,6 +27,7 @@ open Translator Term
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "lt")  _  => return symbolT "<"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "blt") _ => return symbolT "<"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "le") _ => return symbolT "<="
+  | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Sqrt 0) "Real") "sqrt")  _ => return symbolT "sqrt"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "one") _ => return literalT "1"
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "zero") _ => return literalT "0"
   | app (const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "inv'") _)  x => do return Term.mkApp2 (symbolT "/") (literalT "1") (← applyTranslators! x)
