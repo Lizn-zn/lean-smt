@@ -23,6 +23,7 @@ open Translator Term
   | const ``Rat.div _ => return symbolT "div"
   | const ``Rat.lt _  => return symbolT "<"
   | const ``Rat.blt _ => return symbolT "<"
+  | const ``Rat.divInt _ => return symbolT "/"
   | app (app (const ``LE.le _) (const `Rat _)) _ => return symbolT "<="
   | app (app (const ``GT.gt _) (const `Rat _)) _ => return symbolT ">"
   | app (app (const ``GE.ge _) (const `Rat _)) _ => return symbolT ">="
