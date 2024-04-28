@@ -23,7 +23,8 @@ inductive Kind where
   | z3
   | sysol
   | syopt
-  | bottema
+  | mplbt
+  | mplrc
 
 deriving DecidableEq, Inhabited, Hashable
 
@@ -35,7 +36,8 @@ def allKinds : List Kind := [
   Kind.z3,
   Kind.sysol,
   Kind.syopt,
-  Kind.bottema
+  Kind.mplbt,
+  Kind.mplrc,
 ]
 
 instance : ToString Kind where
@@ -47,7 +49,8 @@ instance : ToString Kind where
     | .z3        => "z3"
     | .sysol     => "sysol"
     | .syopt     => "syopt"
-    | .bottema   => "bottema"
+    | .mplbt     => "mplbt"
+    | .mplrc     => "mplrc"
 
 instance : Lean.KVMap.Value Kind where
   toDataValue k := toString k
@@ -59,7 +62,8 @@ instance : Lean.KVMap.Value Kind where
     | "z3"        => Kind.z3
     | "sysol"     => Kind.sysol
     | "syopt"     => Kind.syopt
-    | "bottema"   => Kind.bottema
+    | "mplbt"     => Kind.mplbt
+    | "mplrc"     => Kind.mplrc
     | _           => none
 
 /-- What the binary for a given solver is usually called. -/
@@ -111,7 +115,8 @@ def create (timeoutSecs : Nat) (solvers : List Kind): IO SolverState := do
     (.z3,        #["--timeout", toString timeoutSecs]),
     (.sysol,     #["--timeout", toString timeoutSecs]),
     (.syopt,     #["--timeout", toString timeoutSecs]),
-    (.bottema,   #["--timeout", toString timeoutSecs]),
+    (.mplbt,     #["--timeout", toString timeoutSecs]),
+    (.mplrc,     #["--timeout", toString timeoutSecs]),
   ]
   let args := solvers.foldl (fun acc solver =>
     match allArgs.find? solver with
