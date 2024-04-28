@@ -82,7 +82,8 @@ def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
         match h.raw.getId.getString with
         | "cvc5"    => return Kind.cvc5
         | "z3"      => return Kind.z3
-        | "bottema" => return Kind.bottema
+        | "mplbt" => return Kind.mplbt
+        | "mplrc" => return Kind.mplrc
         | "sysol"   => return Kind.sysol
         | "syopt"   => return Kind.syopt
         | msg => throwError s!"Invalid solver name {msg}")
