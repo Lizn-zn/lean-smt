@@ -87,7 +87,7 @@ def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
         | "sysol"   => return Kind.sysol
         | "syopt"   => return Kind.syopt
         | msg => throwError s!"Invalid solver name {msg}")
-  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.mplrc, mplbt, Kind.sysol, Kind.syopt]
+  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.mplrc, Kind.mplbt, Kind.sysol, Kind.syopt]
   | _ => throwUnsupportedSyntax
 
 def withProcessedHints (hs : List Expr) (k : List Expr → TacticM α): TacticM α :=
