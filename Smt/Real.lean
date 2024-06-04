@@ -16,7 +16,7 @@ namespace Smt.Real
 open Lean Expr
 open Translator Term
 
-#check @DivInvMonoid.div'
+-- #check @DivInvMonoid.div'
 
 @[smtTranslator] def replaceConst : Translator
   | const (Name.str (Name.str (Name.num `_private.Mathlib.Data.Real.Basic 0) "Real") "add") _ => return symbolT "+"

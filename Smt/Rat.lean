@@ -6,7 +6,7 @@ Authors: Abdalrhman Mohamed
 -/
 
 import Lean
-import Std.Data.Rat
+import Batteries.Data.Rat
 import Smt.Translator
 
 namespace Smt.Rat
