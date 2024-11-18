@@ -17,6 +17,8 @@ package smt where
   precompileModules := true
   moreLeanArgs := #[s!"--load-dynlib={libcpp}"]
   moreGlobalServerArgs := #[s!"--load-dynlib={libcpp}"]
+  -- TODO: make this cross-platform
+  moreLinkArgs := #["-L/usr/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu/libstdc++.so.6"]
 
 @[default_target]
 lean_lib Smt
@@ -72,11 +74,10 @@ script test do
 where
   runTest (test : FilePath) (expected : FilePath) : ScriptM UInt32 := do
     IO.println s!"Start : {test}"
-    let imports ← Lean.parseImports' (← IO.FS.readFile test) test.fileName.get!
-    let modules ← imports.filterMapM (findModule? ·.module)
+    let some cvc5 ← findModule? ``cvc5 | return 2
     let out ← IO.Process.output {
       cmd := (← getLean).toString
-      args := #[s!"--load-dynlib={libcpp}"] ++ modules.map (s!"--load-dynlib={·.dynlibFile}") ++ #[test.toString]
+      args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}"] ++ #[test.toString]
       env := ← getAugmentedEnv
     }
     let expected ← IO.FS.readFile expected
@@ -116,11 +117,10 @@ where
   updateTest (test : FilePath) : ScriptM UInt32 := do
     let expected := test.withExtension "expected"
     IO.println s!"Start : {test}"
-    let imports ← Lean.parseImports' (← IO.FS.readFile test) test.fileName.get!
-    let modules ← imports.filterMapM (findModule? ·.module)
+    let some cvc5 ← findModule? ``cvc5 | return 2
     let out ← IO.Process.output {
       cmd := (← getLean).toString
-      args := #[s!"--load-dynlib={libcpp}"] ++ modules.map (s!"--load-dynlib={·.dynlibFile}") ++ #[test.toString]
+      args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}"] ++ #[test.toString]
       env := ← getAugmentedEnv
     }
     IO.FS.writeFile expected out.stdout
@@ -137,12 +137,11 @@ Use Firefox Profiler UI to view profiling information.
 script profile args do
   let file : FilePath := args[0]!
   let log : FilePath := args[1]!
-  let imports ← Lean.parseImports' (← IO.FS.readFile file) file.fileName.get!
-  let modules ← imports.filterMapM (findModule? ·.module)
+  let some cvc5 ← findModule? ``cvc5 | return 2
   let s ← IO.Process.run {
     cmd := (← getLean).toString
-    args := #[s!"--load-dynlib={libcpp}"] ++ modules.map (s!"--load-dynlib={·.dynlibFile}") ++
-            #["-Dtrace.profiler=true", s!"-Dtrace.profiler.output={log}"] ++ #[file.toString]
+    args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}",
+              "-Dtrace.profiler=true", s!"-Dtrace.profiler.output={log}", file.toString]
     env := ← getAugmentedEnv
   }
   IO.println s
