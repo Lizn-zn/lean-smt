@@ -12,6 +12,7 @@ import Smt.Reconstruct
 import Smt.Reconstruct.Prop.Lemmas
 import Smt.Translate.Query
 import Smt.Preprocess
+import Smt.Solver
 import Smt.Util
 
 namespace Smt
@@ -83,6 +84,7 @@ namespace Tactic
 
 syntax smtHints := ("[" term,* "]")?
 syntax smtTimeout := ("(timeout := " num ")")?
+syntax smtSolver := ("(solver := " term,* ")")?
 
 /-- `smt` converts the current goal into an SMT query and checks if it is
 satisfiable. By default, `smt` generates the minimum valid SMT query needed to
@@ -113,7 +115,15 @@ The tactic then generates the query below:
 (check-sat)
 ```
 -/
-syntax (name := smt) "smt" smtHints smtTimeout : tactic
+syntax (name := smt) "smt" smtHints smtTimeout smtSolver : tactic
+
+/-- `smt_only` calls smt solver but does NOT try to reconstruct the proof
+use `smt_only [h₁, h₂, ..., hₙ]` to pass hints and solver to the solver
+use `smt_only (solver := cvc5, z3, sysol, syopt, mplrc, mplbt, mmard, mmafi)` to pass the solver options
+use `smt_only (timeout := 10)` to pass the timeout to the solver
+-/
+syntax (name := smt_only) "smt_only" smtHints smtTimeout smtSolver : tactic
+syntax (name := smt_only!) "smt_only!" smtHints smtTimeout smtSolver : tactic
 
 /-- Like `smt`, but just shows the query without invoking a solver. -/
 syntax (name := smtShow) "smt_show" smtHints : tactic
@@ -126,6 +136,22 @@ def parseHints : TSyntax `smtHints → TacticM (List Expr)
 def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | `(smtTimeout| (timeout := $n)) => return some n.getNat
   | `(smtTimeout| ) => return some 5
+  | _ => throwUnsupportedSyntax
+
+def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
+  | `(smtSolver| (solver := $[$hs],*)) =>
+      hs.toList.mapM (fun h =>
+        match h.raw.getId.getString! with
+        | "cvc5"    => return Kind.cvc5
+        | "z3"      => return Kind.z3
+        | "mplbt"   => return Kind.mplbt
+        | "mplrc"   => return Kind.mplrc
+        | "sysol"   => return Kind.sysol
+        | "syopt"   => return Kind.syopt
+        | "mmard"   => return Kind.mmard
+        | "mmafi"   => return Kind.mmafi
+        | msg => throwError s!"Invalid solver name {msg}")
+  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.mplrc, Kind.mplbt, Kind.sysol, Kind.syopt]
   | _ => throwUnsupportedSyntax
 
 @[tactic smt] def evalSmt : Tactic := fun stx => withMainContext do
@@ -143,5 +169,105 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   let cmds ← prepareSmtQuery hs (← mv.getType) (← genUniqueFVarNames).fst
   let cmds := cmds ++ [.checkSat]
   logInfo m!"goal: {goalType}\n\nquery:\n{Command.cmdsAsQuery cmds}"
+
+
+axiom SMT_VERIF (P : Prop) : P
+
+/-
+  Close the current goal using the above axiom.
+  It is crucial to ensure that this is only invoked when an `unsat` result is returned
+-/
+def closeWithAxiom : TacticM Unit := do
+  let _ ← evalTactic (← `(tactic| apply SMT_VERIF))
+  return ()
+
+def withProcessedHintsOnly (hs : List Expr) (k : List Expr → TacticM α): TacticM α :=
+  withProcessHints' hs [] k
+where
+  withProcessHints' (hs : List Expr) (fvs : List Expr) (k : List Expr → TacticM α): TacticM α := do
+    match hs with
+    | [] => k fvs
+    | h :: hs =>
+      if h.isFVar || h.isConst then
+        withProcessHints' hs (h :: fvs) k
+      else
+        let mv ← Tactic.getMainGoal
+        let mv ← mv.assert (← mkFreshId) (← Meta.inferType h) h
+        let ⟨fv, mv⟩ ← mv.intro1
+        Tactic.replaceMainGoal [mv]
+        withMainContext (withProcessHints' hs (.fvar fv :: fvs) k)
+
+@[tactic smt_only] def evalSmtOnly : Tactic := fun stx => withMainContext do
+  let g ← Meta.mkFreshExprMVar (← getMainTarget)
+  let mv := g.mvarId!
+  let goalType ← mv.getType
+  -- 1. Get the hints and solvers and timeout passed to the tactic.
+  let mut hs ← parseHints ⟨stx[1]⟩
+  hs := hs.eraseDups
+  let mut timeout ← parseTimeout ⟨stx[2]⟩
+  let mut solvers ← parseSolver ⟨stx[3]⟩
+  withProcessedHintsOnly hs fun hs => do
+  -- 2. Generate the SMT query.
+  let cmds ← prepareSmtQuery hs (← mv.getType) (← genUniqueFVarNames).fst
+  let cmds := cmds ++ [.checkSat]
+  let cmds := cmds ++ [.getModel]
+  let query := Solver.addCommands cmds *> Solver.checkSat
+  logInfo m!"goal: {goalType}"
+  logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
+  -- 3. Run the solver.
+  let ss ← Solver.create timeout.get! solvers
+  let res ← StateT.run' query ss
+  -- 4. Print the result.
+  logInfo m!"result: {res}"
+  match res with
+  | .sat msg =>
+    -- 4a. Print model.
+    throwError s!"counter example exists: {msg}"
+  | .unknown msg => throwError s!"unable to prove goal {msg}"
+  | .except msg => throwError s!"solver exceptions {msg}"
+  | .timeout _ => throwError "the solver timed out"
+  | .unsat _ => closeWithAxiom
+
+def getLocalHypotheses : MetaM (List Expr) := do
+  let ctx ← getLCtx
+  let mut hs := #[]
+  for localDecl in ctx do
+    if localDecl.isImplementationDetail then
+      continue
+    let e ← instantiateMVars localDecl.toExpr
+    let et ← Meta.inferType e >>= instantiateMVars
+    if (← Meta.isProp et) then
+      hs := hs.push localDecl.toExpr
+  return hs.toList.eraseDups
+
+@[tactic smt_only!] def evalSmtOnly! : Tactic := fun stx => withMainContext do
+  -- 1. Get the hints passed to the tactic.
+  let hs ← getLocalHypotheses
+  let g ← Meta.mkFreshExprMVar (← getMainTarget)
+  let mv := g.mvarId!
+  let goalType ← Tactic.getMainTarget
+  let timeout ← parseTimeout ⟨stx[2]⟩
+  let solvers ← parseSolver ⟨stx[3]⟩
+  withProcessedHintsOnly hs fun hs => do
+    -- 2. Generate the SMT query.
+    let cmds ← prepareSmtQuery hs (← mv.getType) (← genUniqueFVarNames).fst
+    let cmds := cmds ++ [.checkSat]
+    let cmds := cmds ++ [.getModel]
+    let query := Solver.addCommands cmds *> Solver.checkSat
+    logInfo m!"goal: {goalType}"
+    logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
+    -- 3. Run the solver.
+    let ss ← Solver.create timeout.get! solvers
+    let res ← StateT.run' query ss
+    -- 4. Print the result.
+    logInfo m!"result: {res}"
+    match res with
+    | .sat msg =>
+      -- 4a. Print model.
+      throwError s!"counter example exists: {msg}"
+    | .unknown msg => throwError s!"unable to prove goal {msg}"
+    | .except msg => throwError s!"solver exceptions {msg}"
+    | .timeout _ => throwError "the solver timed out"
+    | .unsat _ => closeWithAxiom
 
 end Smt.Tactic
