@@ -3,7 +3,7 @@ import Lake
 open Lake DSL
 
 require cvc5 from
-  git "https://github.com/abdoo8080/lean-cvc5.git" @ "c97ff4cfc218c11af8c1598b8225a6fcc094f5cd"
+  git "https://github.com/Lizn-zn/lean-cvc5" @ "v4.11.0"
 
 require mathlib from
   git "https://github.com/leanprover-community/mathlib4.git" @ "v4.11.0"
@@ -17,8 +17,6 @@ package smt where
   precompileModules := true
   moreLeanArgs := #[s!"--load-dynlib={libcpp}"]
   moreGlobalServerArgs := #[s!"--load-dynlib={libcpp}"]
-  -- TODO: make this cross-platform
-  moreLinkArgs := #["-L/usr/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu/libstdc++.so.6"]
 
 @[default_target]
 lean_lib Smt
