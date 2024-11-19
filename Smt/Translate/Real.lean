@@ -7,8 +7,9 @@ Authors: Abdalrhman Mohamed
 
 import Qq
 
+import Lean
 import Mathlib.Data.Real.Archimedean
--- import Mathlib.Data.Real.Sqrt
+import Mathlib.Data.Real.Sqrt
 
 import Smt.Translate
 
@@ -36,9 +37,9 @@ open Translator Term
   | ~q($x - $y) => return mkApp2 (symbolT "-") (← applyTranslators! x) (← applyTranslators! y)
   | ~q($x * $y) => return mkApp2 (symbolT "*") (← applyTranslators! x) (← applyTranslators! y)
   | ~q($x / $y) => return mkApp2 (symbolT "/") (← applyTranslators! x) (← applyTranslators! y)
-  -- add more operators --
+  -- add more mathlib operators for smt --
   | ~q($x ^ $y) => return mkApp2 (symbolT "^") (← applyTranslators! x) (← applyTranslators! y)
-  -- | ~q(Real.sqrt $x) => return appT (symbolT "sqrt") (← applyTranslators! x)
+  | ~q(Real.sqrt $x) => return appT (symbolT "sqrt") (← applyTranslators! x)
   | _           => return none
 
 @[smt_translate] def translateProp : Translator := fun (e : Q(Prop)) => match e with
@@ -48,5 +49,6 @@ open Translator Term
   | ~q(($x : Real) ≥ $y) => return mkApp2 (symbolT ">=") (← applyTranslators! x) (← applyTranslators! y)
   | ~q(($x : Real) > $y) => return mkApp2 (symbolT ">") (← applyTranslators! x) (← applyTranslators! y)
   | _                    => return none
+
 
 end Smt.Translate.Rat
