@@ -11,6 +11,7 @@ jobs:
         include:
         - name: Linux
           os: ubuntu-latest
+          # os: macos-latest
     steps:
     - name: Install CMake
       run: |
