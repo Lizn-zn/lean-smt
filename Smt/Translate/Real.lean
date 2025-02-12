@@ -10,6 +10,7 @@ import Qq
 import Lean
 import Mathlib.Data.Real.Archimedean
 import Mathlib.Data.Real.Sqrt
+import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 import Smt.Translate
 
@@ -17,6 +18,7 @@ namespace Smt.Translate.Rat
 
 open Qq
 open Translator Term
+
 
 @[smt_translate] def translateType : Translator := fun (e : Q(Type)) => match e with
   | ~q(Real)  => return symbolT "Real"
@@ -39,6 +41,7 @@ open Translator Term
   | ~q($x / $y) => return mkApp2 (symbolT "/") (← applyTranslators! x) (← applyTranslators! y)
   -- add more mathlib operators for smt --
   | ~q($x ^ $y) => return mkApp2 (symbolT "^") (← applyTranslators! x) (← applyTranslators! y)
+  | ~q(($x : Real) ^ ($y : Real)) => return mkApp2 (symbolT "^") (← applyTranslators! x) (← applyTranslators! y)
   | ~q(Real.sqrt $x) => return appT (symbolT "sqrt") (← applyTranslators! x)
   | _           => return none
 
@@ -49,6 +52,8 @@ open Translator Term
   | ~q(($x : Real) ≥ $y) => return mkApp2 (symbolT ">=") (← applyTranslators! x) (← applyTranslators! y)
   | ~q(($x : Real) > $y) => return mkApp2 (symbolT ">") (← applyTranslators! x) (← applyTranslators! y)
   | _                    => return none
+
+
 
 
 end Smt.Translate.Rat
