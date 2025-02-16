@@ -151,7 +151,7 @@ def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
         | "mmard"   => return Kind.mmard
         | "mmafi"   => return Kind.mmafi
         | msg => throwError s!"Invalid solver name {msg}")
-  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.mplrc, Kind.mplbt, Kind.sysol, Kind.syopt]
+  | `(smtSolver| ) => return [Kind.cvc5, Kind.z3, Kind.mplrc, Kind.mplbt, Kind.mmard, Kind.mmafi]
   | _ => throwUnsupportedSyntax
 
 @[tactic smt] def evalSmt : Tactic := fun stx => withMainContext do
