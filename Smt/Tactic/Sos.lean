@@ -22,7 +22,7 @@ open Lean hiding Command
 open Elab Tactic Qq
 open Smt Translate Query Reconstruct Util
 
-def genUniqueFVarNames : MetaM (HashMap FVarId String × HashMap String FVarId) := do
+def genUniqueFVarNames : MetaM (Std.HashMap FVarId String × Std.HashMap String FVarId) := do
   let lCtx ← getLCtx
   let st : NameSanitizerState := { options := {}}
   let (lCtx, _) := (lCtx.sanitizeNames st).run
@@ -31,7 +31,7 @@ def genUniqueFVarNames : MetaM (HashMap FVarId String × HashMap String FVarId) 
     let m₂ := m₂.insert (lCtx.getRoundtrippingUserName? fvarId).get!.toString fvarId
     (m₁, m₂)
 
-def prepareSmtQuery (hs : List Expr) (goalType : Expr) (fvNames : HashMap FVarId String) : MetaM (List Command) := do
+def prepareSmtQuery (hs : List Expr) (goalType : Expr) (fvNames : Std.HashMap FVarId String) : MetaM (List Command) := do
   let goalId ← Lean.mkFreshMVarId
   Lean.Meta.withLocalDeclD goalId.name (mkNot goalType) fun g =>
   Query.generateQuery g hs fvNames
@@ -54,8 +54,8 @@ where
 namespace Tactic
 
 syntax smtHints := ("[" term,* "]")?
-syntax smtTimeout := ("(timeout := " num ")")?
-syntax smtSolver := ("(solver := " term,* ")")?
+syntax smtTimeout := ("(" "timeout" " := " num ")")?
+syntax smtSolver := ("(" "solver" " := " term,* ")")?
 
 /-- `sos` calls sum-of-squares prover
 use `sos [h₁, h₂, ..., hₙ]` to pass hints and solver to the solver
@@ -119,7 +119,7 @@ where
   -- 1. Get the hints and solvers and timeout passed to the tactic.
   let mut hs ← parseHints ⟨stx[1]⟩
   hs := hs.eraseDups
-  let mut timeout ← parseTimeout ⟨stx[2]⟩
+  let mut timelimit ← parseTimeout ⟨stx[2]⟩
   let mut solvers ← parseSolver ⟨stx[3]⟩
   withProcessedHintsOnly hs fun hs => do
   -- 2. Generate the SMT query.
@@ -130,7 +130,7 @@ where
   logInfo m!"goal: {goalType}"
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
   -- 3. Run the solver.
-  let ss ← Prover.create timeout.get! solvers
+  let ss ← Prover.create timelimit.get! solvers
   let res ← StateT.run' query ss
   -- 4. Print the result.
   logInfo m!"result: {res}"
@@ -157,7 +157,7 @@ def getLocalHypotheses : MetaM (List Expr) := do
   let g ← Meta.mkFreshExprMVar (← getMainTarget)
   let mv := g.mvarId!
   let goalType ← Tactic.getMainTarget
-  let timeout ← parseTimeout ⟨stx[2]⟩
+  let timelimit ← parseTimeout ⟨stx[2]⟩
   let solvers ← parseSolver ⟨stx[3]⟩
   withProcessedHintsOnly hs fun hs => do
     -- 2. Generate the SMT query.
@@ -168,7 +168,7 @@ def getLocalHypotheses : MetaM (List Expr) := do
     logInfo m!"goal: {goalType}"
     logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
     -- 3. Run the solver.
-    let ss ← Prover.create timeout.get! solvers
+    let ss ← Prover.create timelimit.get! solvers
     let res ← StateT.run' query ss
     -- 4. Print the result.
     logInfo m!"result: {res}"

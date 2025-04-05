@@ -21,7 +21,7 @@ open Lean hiding Command
 open Elab Tactic Qq
 open Smt Translate Query Reconstruct Util
 
-def genUniqueFVarNames : MetaM (HashMap FVarId String × HashMap String FVarId) := do
+def genUniqueFVarNames : MetaM (Std.HashMap FVarId String × Std.HashMap String FVarId) := do
   let lCtx ← getLCtx
   let st : NameSanitizerState := { options := {}}
   let (lCtx, _) := (lCtx.sanitizeNames st).run
@@ -30,7 +30,7 @@ def genUniqueFVarNames : MetaM (HashMap FVarId String × HashMap String FVarId) 
     let m₂ := m₂.insert (lCtx.getRoundtrippingUserName? fvarId).get!.toString fvarId
     (m₁, m₂)
 
-def prepareSmtQuery (hs : List Expr) (goalType : Expr) (fvNames : HashMap FVarId String) : MetaM (List Command) := do
+def prepareSmtQuery (hs : List Expr) (goalType : Expr) (fvNames : Std.HashMap FVarId String) : MetaM (List Command) := do
   let goalId ← Lean.mkFreshMVarId
   Lean.Meta.withLocalDeclD goalId.name (mkNot goalType) fun g =>
   Query.generateQuery g hs fvNames
@@ -83,8 +83,8 @@ def smt (mv : MVarId) (hs : List Expr) (timeout : Option Nat := none) : MetaM (L
 namespace Tactic
 
 syntax smtHints := ("[" term,* "]")?
-syntax smtTimeout := ("(timeout := " num ")")?
-syntax smtSolver := ("(solver := " term,* ")")?
+syntax smtTimeout := ("(" "timeout" " := " num ")")?
+syntax smtSolver := ("(" "solvers" " := " term,* ")")?
 
 /-- `smt` converts the current goal into an SMT query and checks if it is
 satisfiable. By default, `smt` generates the minimum valid SMT query needed to
@@ -119,7 +119,7 @@ syntax (name := smt) "smt" smtHints smtTimeout smtSolver : tactic
 
 /-- `smt_decide` calls smt solver but does NOT try to reconstruct the proof
 use `smt_decide [h₁, h₂, ..., hₙ]` to pass hints and solver to the solver
-use `smt_decide (solver := cvc5, z3, sysol, syopt, mplrc, mplbt, mmard, mmafi)` to pass the solver options
+use `smt_decide (solvers := cvc5, z3, sysol, syopt, mplrc, mplbt, mmard, mmafi)` to pass the solver options
 use `smt_decide (timeout := 10)` to pass the timeout to the solver
 -/
 syntax (name := smt_decide) "smt_decide" smtHints smtTimeout smtSolver : tactic
@@ -139,7 +139,7 @@ def parseTimeout : TSyntax `smtTimeout → TacticM (Option Nat)
   | _ => throwUnsupportedSyntax
 
 def parseSolver : TSyntax `smtSolver → TacticM (List Kind)
-  | `(smtSolver| (solver := $[$hs],*)) =>
+  | `(smtSolver| (solvers := $[$hs],*)) =>
       hs.toList.mapM (fun h =>
         match h.raw.getId.getString! with
         | "cvc5"    => return Kind.cvc5
@@ -204,8 +204,8 @@ where
   -- 1. Get the hints and solvers and timeout passed to the tactic.
   let mut hs ← parseHints ⟨stx[1]⟩
   hs := hs.eraseDups
-  let mut timeout ← parseTimeout ⟨stx[2]⟩
-  let mut solvers ← parseSolver ⟨stx[3]⟩
+  let mut timelimit ← parseTimeout ⟨stx[2]⟩
+  let mut solverlist ← parseSolver ⟨stx[3]⟩
   withProcessedHintsOnly hs fun hs => do
   -- 2. Generate the SMT query.
   let cmds ← prepareSmtQuery hs (← mv.getType) (← genUniqueFVarNames).fst
@@ -215,7 +215,7 @@ where
   logInfo m!"goal: {goalType}"
   logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
   -- 3. Run the solver.
-  let ss ← Solver.create timeout.get! solvers
+  let ss ← Solver.create timelimit.get! solverlist
   let res ← StateT.run' query ss
   -- 4. Print the result.
   logInfo m!"result: {res}"
@@ -246,8 +246,8 @@ def getLocalHypotheses : MetaM (List Expr) := do
   let g ← Meta.mkFreshExprMVar (← getMainTarget)
   let mv := g.mvarId!
   let goalType ← Tactic.getMainTarget
-  let timeout ← parseTimeout ⟨stx[2]⟩
-  let solvers ← parseSolver ⟨stx[3]⟩
+  let timelimit ← parseTimeout ⟨stx[2]⟩
+  let solverlist ← parseSolver ⟨stx[3]⟩
   withProcessedHintsOnly hs fun hs => do
     -- 2. Generate the SMT query.
     let cmds ← prepareSmtQuery hs (← mv.getType) (← genUniqueFVarNames).fst
@@ -257,7 +257,7 @@ def getLocalHypotheses : MetaM (List Expr) := do
     logInfo m!"goal: {goalType}"
     logInfo m!"query:\n{Command.cmdsAsQuery cmds}"
     -- 3. Run the solver.
-    let ss ← Solver.create timeout.get! solvers
+    let ss ← Solver.create timelimit.get! solverlist
     let res ← StateT.run' query ss
     -- 4. Print the result.
     logInfo m!"result: {res}"

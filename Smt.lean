@@ -16,7 +16,6 @@ import Smt.Quant
 import Smt.String
 import Smt.Tactic
 import Smt.UF
-
 import Smt.Real
 
 import Smt.Translate.Solver
