@@ -103,7 +103,7 @@ private def mkNullaryCtor (type : Expr) (nparams : Nat) : MetaM (Option Expr) :=
   match type.getAppFn with
   | Expr.const d lvls =>
     let (some ctor) ← getFirstCtor d | pure none
-    return mkAppN (mkConst ctor lvls) (type.getAppArgs.shrink nparams)
+    return mkAppN (mkConst ctor lvls) (type.getAppArgs.take nparams)
   | _ =>
     return none
 
@@ -124,7 +124,7 @@ private def toCtorWhenK (recVal : RecursorVal) (major : Expr) : ReductionM Expr 
   let majorType ← inferType major
   let majorType ← instantiateMVars (← whnf majorType)
   let majorTypeI := majorType.getAppFn
-  if !majorTypeI.isConstOf recVal.getInduct then
+  if !majorTypeI.isConstOf recVal.getMajorInduct then
     return major
   else if majorType.hasExprMVar && majorType.getAppArgs[recVal.numParams:].any Expr.hasExprMVar then
     return major
@@ -181,7 +181,7 @@ private def toCtorWhenStructure (inductName : Name) (major : Expr) : ReductionM 
       else
         let some ctorName ← getFirstCtor d | pure major
         let ctorInfo ← getConstInfoCtor ctorName
-        let params := majorType.getAppArgs.shrink ctorInfo.numParams
+        let params := majorType.getAppArgs.take ctorInfo.numParams
         let mut result := mkAppN (mkConst ctorName us) params
         for i in [:ctorInfo.numFields] do
           result := mkApp result (← mkProjFn ctorInfo us params i major)
@@ -200,7 +200,7 @@ private def reduceRec (recVal : RecursorVal) (recLvls : List Level) (recArgs : A
       if recVal.k then
         major ← toCtorWhenK recVal major
       major := toCtorIfLit major
-      major ← toCtorWhenStructure recVal.getInduct major
+      major ← toCtorWhenStructure recVal.getMajorInduct major
       let some rule := getRecRuleFor recVal major | return none
       let majorArgs := major.getAppArgs
       guard (recLvls.length == recVal.levelParams.length)
@@ -223,7 +223,7 @@ private def reduceRec (recVal : RecursorVal) (recLvls : List Level) (recArgs : A
         trace[Smt.reduce.rec] "failed."
         failK ()
 
-    let major ← whnf <| recArgs.get ⟨majorIdx, h⟩
+    let major ← whnf <| recArgs[majorIdx]'h
     if (← read).letPushElim then
       letTelescopeAbstracting major fun _ major abs => do
         let e' ← cont major
@@ -239,12 +239,12 @@ private def reduceRec (recVal : RecursorVal) (recLvls : List Level) (recArgs : A
    =========================== -/
 
 /-- Auxiliary function for reducing `Quot.lift` and `Quot.ind` applications. -/
-private def reduceQuotRec (recVal  : QuotVal) (recLvls : List Level) (recArgs : Array Expr)
+private def reduceQuotRec (recVal  : QuotVal) (recArgs : Array Expr)
     (failK : Unit → ReductionM α) (successK : Expr → ReductionM α)
     : ReductionM α :=
   let process (majorPos argPos : Nat) : ReductionM α :=
     if h : majorPos < recArgs.size then do
-      let major := recArgs.get ⟨majorPos, h⟩
+      let major := recArgs[majorPos]'h
       let major ← whnf major
       match major with
       | Expr.app (Expr.app (Expr.app (Expr.const majorFn _) _) _) majorArg => do
@@ -273,7 +273,7 @@ mutual
     else do
       let majorIdx := recVal.getMajorIdx
       if h : majorIdx < recArgs.size then do
-        let major := recArgs.get ⟨majorIdx, h⟩
+        let major := recArgs[majorIdx]'h
         let major ← whnf major
         getStuckMVar? major
       else
@@ -282,7 +282,7 @@ mutual
   private partial def isQuotRecStuck? (recVal : QuotVal) (recArgs : Array Expr) : ReductionM (Option MVarId) :=
     let process? (majorPos : Nat) : ReductionM (Option MVarId) :=
       if h : majorPos < recArgs.size then do
-        let major := recArgs.get ⟨majorPos, h⟩
+        let major := recArgs[majorPos]'h
         let major ← whnf major
         getStuckMVar? major
       else
@@ -339,11 +339,11 @@ end
     match decl with
     | LocalDecl.cdecl .. => return e
     | LocalDecl.ldecl (value := v) (nonDep := nonDep) .. =>
-      let cfg ← getConfig
+      let ctx ← (read : MetaM Meta.Context)
       if nonDep then
         return e
       else
-        if cfg.trackZetaDelta then
+        if ctx.trackZetaDelta then
           modify fun s => { s with zetaDeltaFVarIds := s.zetaDeltaFVarIds.insert fvarId }
         whnfEasyCases v k
   | Expr.mvar mvarId   =>
@@ -440,9 +440,9 @@ private def whnfMatcher (e : Expr) : ReductionM Expr := do
   let mut transparency ← getTransparency
   if transparency == TransparencyMode.reducible then
     transparency := TransparencyMode.instances
-  withTransparency transparency <|
-    withTheReader Meta.Context (fun ctx => { ctx with canUnfold? := canUnfoldAtMatcher ctx.canUnfold? }) do
-      whnf e
+  withTransparency transparency do
+    let ctx ← readThe Meta.Context
+    withCanUnfoldPred (canUnfoldAtMatcher ctx.canUnfold?) (whnf e)
 
 def reduceMatcher? (e : Expr) : ReductionM ReduceMatcherResult := do
   trace[Smt.reduce.matcher] "{e}"
@@ -583,7 +583,7 @@ where
               matchConstAux f (fun _ => return e) fun cinfo lvls =>
                 match cinfo with
                 | ConstantInfo.recInfo rec    => reduceRec rec lvls revArgs.reverse (fun _ => return e) go
-                | ConstantInfo.quotInfo rec   => reduceQuotRec rec lvls revArgs.reverse (fun _ => return e) go
+                | ConstantInfo.quotInfo rec   => reduceQuotRec rec revArgs.reverse (fun _ => return e) go
                 | c@(ConstantInfo.defnInfo _) => do
                   if (← isAuxDef c.name) then
                     deltaBetaDefinition c lvls revArgs (fun _ => return e) go
@@ -702,7 +702,7 @@ where
 
 def shouldUnfold (ci : ConstantInfo) : ReductionM Bool := do
   let some canUnfold := (← readThe Meta.Context).canUnfold? | return true
-  let cfg := (← readThe Meta.Context).config
+  let cfg ← getConfig (← readThe Meta.Context)
   canUnfold cfg ci
 
 mutual
@@ -850,7 +850,7 @@ def reduceRecMatcher? (e : Expr) : ReductionM (Option Expr) := do
     | _ => matchConstAux e.getAppFn (fun _ => pure none) fun cinfo lvls => do
       match cinfo with
       | ConstantInfo.recInfo «rec»  => reduceRec «rec» lvls e.getAppArgs (fun _ => pure none) (fun e => pure (some e))
-      | ConstantInfo.quotInfo «rec» => reduceQuotRec «rec» lvls e.getAppArgs (fun _ => pure none) (fun e => pure (some e))
+      | ConstantInfo.quotInfo «rec» => reduceQuotRec «rec» e.getAppArgs (fun _ => pure none) (fun e => pure (some e))
       | c@(ConstantInfo.defnInfo _) =>
         if (← isAuxDef c.name) then
           deltaBetaDefinition c lvls e.getAppRevArgs (fun _ => pure none) (fun e => pure (some e))
@@ -930,17 +930,18 @@ def reduceNat? (e : Expr) : ReductionM (Option Expr) :=
 @[inline] private def cached? (useCache : Bool) (e : Expr) : MetaM (Option Expr) := do
   if useCache then
     match (← getConfig).transparency with
-    | TransparencyMode.default => return (← get).cache.whnfDefault.find? e
-    | TransparencyMode.all     => return (← get).cache.whnfAll.find? e
+    | TransparencyMode.default => return (← get).cache.whnf.find? (← mkExprConfigCacheKey e)
+    | TransparencyMode.all     => return (← get).cache.whnf.find? (← mkExprConfigCacheKey e)
     | _                        => unreachable!
   else
     return none
 
 private def cache (useCache : Bool) (e r : Expr) : MetaM Expr := do
   if useCache then
+    let ecck ← mkExprConfigCacheKey e
     match (← getConfig).transparency with
-    | TransparencyMode.default => modify fun s => { s with cache.whnfDefault := s.cache.whnfDefault.insert e r }
-    | TransparencyMode.all     => modify fun s => { s with cache.whnfAll     := s.cache.whnfAll.insert e r }
+    | TransparencyMode.default => modify fun s => { s with cache.whnf := s.cache.whnf.insert ecck r }
+    | TransparencyMode.all     => modify fun s => { s with cache.whnf := s.cache.whnf.insert ecck r }
     | _                        => unreachable!
   return r
 

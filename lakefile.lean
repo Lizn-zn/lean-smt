@@ -2,21 +2,16 @@ import Lake
 
 open Lake DSL
 
+require auto from
+  git "https://github.com/leanprover-community/lean-auto.git" @ "f1ed94c00377128e53fed4255985ebfa88fd5c48"
+
 require cvc5 from
-  git "https://github.com/Lizn-zn/lean-cvc5" @ "v4.11.0"
+  git "https://github.com/Lizn-zn/lean-cvc5.git" @ "v4.15.0"
 
 require mathlib from
-  git "https://github.com/leanprover-community/mathlib4.git" @ "v4.11.0"
+  git "https://github.com/leanprover-community/mathlib4.git" @ "v4.15.0"
 
-def libcpp : String :=
-  if System.Platform.isWindows then "libstdc++-6.dll"
-  else if System.Platform.isOSX then "libc++.dylib"
-  else "libstdc++.so.6"
-
-package smt where
-  precompileModules := true
-  moreLeanArgs := #[s!"--load-dynlib={libcpp}"]
-  moreGlobalServerArgs := #[s!"--load-dynlib={libcpp}"]
+package smt
 
 @[default_target]
 lean_lib Smt
@@ -41,7 +36,7 @@ USAGE:
 
 Run tests.
 -/
-script test do
+@[test_driver] script test do
   let files ← readAllFiles (FilePath.mk "Test")
   let mut tests : Array FilePath := #[]
   let mut expected : Array FilePath := #[]
@@ -75,7 +70,7 @@ where
     let some cvc5 ← findModule? ``cvc5 | return 2
     let out ← IO.Process.output {
       cmd := (← getLean).toString
-      args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}"] ++ #[test.toString]
+      args := #[s!"--load-dynlib={cvc5.dynlibFile}", test.toString]
       env := ← getAugmentedEnv
     }
     let expected ← IO.FS.readFile expected
@@ -118,7 +113,7 @@ where
     let some cvc5 ← findModule? ``cvc5 | return 2
     let out ← IO.Process.output {
       cmd := (← getLean).toString
-      args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}"] ++ #[test.toString]
+      args := #[s!"--load-dynlib={cvc5.dynlibFile}", test.toString]
       env := ← getAugmentedEnv
     }
     IO.FS.writeFile expected out.stdout
@@ -136,11 +131,10 @@ script profile args do
   let file : FilePath := args[0]!
   let log : FilePath := args[1]!
   let some cvc5 ← findModule? ``cvc5 | return 2
-  let s ← IO.Process.run {
+  let child ← IO.Process.spawn {
     cmd := (← getLean).toString
-    args := #[s!"--load-dynlib={libcpp}", s!"--load-dynlib={cvc5.dynlibFile}",
-              "-Dtrace.profiler=true", s!"-Dtrace.profiler.output={log}", file.toString]
+    args := #[s!"--load-dynlib={cvc5.dynlibFile}", "-Dtrace.profiler=true",
+              s!"-Dtrace.profiler.output={log}", file.toString]
     env := ← getAugmentedEnv
   }
-  IO.println s
-  return 0
+  child.wait

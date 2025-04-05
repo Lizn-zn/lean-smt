@@ -15,15 +15,17 @@ namespace Smt
 open Lean
 open Attribute
 
-structure Reconstruct.state where
-  userNames : HashMap String FVarId
-  termCache : HashMap cvc5.Term Expr
-  proofCache : HashMap cvc5.Proof Expr
-  count : Nat
-  currAssums : Array Expr
-  skippedGoals : Array MVarId
+structure Reconstruct.Context where
+  userNames : Std.HashMap String FVarId := {}
 
-abbrev ReconstructM := StateT Reconstruct.state MetaM
+structure Reconstruct.State where
+  termCache : Std.HashMap cvc5.Term Expr := {}
+  proofCache : Std.HashMap cvc5.Proof Expr := {}
+  count : Nat := 0
+  currAssums : Array Expr := #[]
+  skippedGoals : Array MVarId := #[]
+
+abbrev ReconstructM := ReaderT Reconstruct.Context (StateT Reconstruct.State MetaM)
 
 abbrev SortReconstructor := cvc5.Sort → ReconstructM (Option Expr)
 
@@ -35,7 +37,7 @@ namespace Reconstruct
 
 private unsafe def getReconstructorsUnsafe (n : Name) (rcons : Type) : MetaM (List (rcons × Name)) := do
   let env ← getEnv
-  let names := ((smtExt.getState env).findD n {}).toList
+  let names := ((smtExt.getState env).getD n {}).toList
   let mut reconstructors := []
   for name in names do
     let fn ← IO.ofExcept <| Id.run <| ExceptT.run <|
@@ -57,6 +59,11 @@ where
         return e
     throwError "Failed to reconstruct sort {s} with kind {s.getKind}"
 
+def reconstructSortLevelAndSort (s : cvc5.Sort) : ReconstructM (Level × Expr) := do
+  let t ← reconstructSort s
+  let .sort u ← Meta.inferType t | throwError "expected a sort, but got\n{t}"
+  return ⟨u, t⟩
+
 def withNewTermCache (k : ReconstructM α) : ReconstructM α := do
   let termCache := (← get).termCache
   modify fun state => { state with termCache := {} }
@@ -75,7 +82,7 @@ def reconstructTerm : cvc5.Term → ReconstructM Expr := withTermCache fun t => 
     go rs t
 where
   withTermCache (r : cvc5.Term → ReconstructM Expr) (t : cvc5.Term) : ReconstructM Expr := do
-    match (← get).termCache.find? t with
+    match (← get).termCache[t]? with
     -- TODO: cvc5's global bound variables mess up the cache. Find a better fix.
     | some e => return e
     | none   => reconstruct r t
@@ -90,6 +97,13 @@ where
         return e
     throwError "Failed to reconstruct term {t} with kind {t.getKind}"
 
+open Qq in
+def reconstructTerms {u} {α : Q(Type $u)} (ts : Array cvc5.Term) : ReconstructM Q(List $α) :=
+  let f := fun t ys => do
+    let a : Q($α) ← reconstructTerm t
+    return q($a :: $ys)
+  ts.foldrM f q([])
+
 def withNewProofCache (k : ReconstructM α) : ReconstructM α := do
   let proofCache := (← get).proofCache
   modify fun state => { state with proofCache := {} }
@@ -98,7 +112,7 @@ def withNewProofCache (k : ReconstructM α) : ReconstructM α := do
   return r
 
 def withProofCache (r : cvc5.Proof → ReconstructM Expr) (pf : cvc5.Proof) : ReconstructM Expr := do
-  match (← get).proofCache.find? pf with
+  match (← get).proofCache[pf]? with
   | some e => return e
   | none   => reconstruct r pf
 where
@@ -113,7 +127,7 @@ def incCount : ReconstructM Nat :=
 def withAssums (as : Array Expr) (k : ReconstructM α) : ReconstructM α := do
   modify fun state => { state with currAssums := state.currAssums ++ as }
   let r ← k
-  modify fun state => { state with currAssums := state.currAssums.shrink (state.currAssums.size - as.size) }
+  modify fun state => { state with currAssums := state.currAssums.take (state.currAssums.size - as.size) }
   return r
 
 def findAssumWithType? (t : Expr) : ReconstructM (Option Expr) := do
@@ -181,11 +195,15 @@ def traceReconstructProof (r : Except Exception (Expr × Expr × List MVarId)) :
   | _     => m!"{bombEmoji}"
 
 open Qq in
-partial def reconstructProof (pf : cvc5.Proof) (fvNames : HashMap String FVarId) : MetaM (Expr × Expr × List MVarId) := do
+partial def reconstructProof (pf : cvc5.Proof) (userNames : Std.HashMap String FVarId) : MetaM (Expr × Expr × List MVarId) := do
   withTraceNode `smt.reconstruct.proof traceReconstructProof do
-  let Prod.mk (p : Q(Prop)) state ← (Reconstruct.reconstructTerm (pf.getResult)).run ⟨fvNames, {}, {}, 0, #[], #[]⟩
-  let Prod.mk (h : Q(True → $p)) (.mk _ _ _ _ _ mvs) ← (Reconstruct.reconstructProof pf).run state
-  return (p, q($h trivial), mvs.toList)
+  let Prod.mk (p : Q(Prop)) state ← (Reconstruct.reconstructTerm (pf.getResult)).run { userNames } {}
+  let (h, ⟨_, _, _, _, mvs⟩) ← (Reconstruct.reconstructProof pf).run { userNames } state
+  if pf.getArguments.isEmpty then
+    let h : Q(True → $p) ← pure h
+    return (p, q($h trivial), mvs.toList)
+  else
+    return (p, h, mvs.toList)
 
 open cvc5 in
 def traceSolve (r : Except Exception (Except SolverError Proof)) : MetaM MessageData :=
@@ -207,7 +225,7 @@ def solve (query : String) (timeout : Option Nat) : MetaM (Except Error cvc5.Pro
     Solver.setOption "produce-proofs" "true"
     Solver.setOption "proof-elim-subtypes" "true"
     Solver.setOption "proof-granularity" "dsl-rewrite"
-    Solver.parse query
+    Solver.parseCommands query
     let r ← Solver.checkSat
     trace[smt.solve] m!"result: {r}"
     if r.isUnsat then
@@ -215,7 +233,7 @@ def solve (query : String) (timeout : Option Nat) : MetaM (Except Error cvc5.Pro
       if h : 0 < ps.size then
         trace[smt.solve] "proof:\n{← Solver.proofToString ps[0]}"
         return ps[0]
-    throw (self := instMonadExceptOfMonadExceptOf _ _) (Error.user_error "something went wrong")
+    throw (self := instMonadExceptOfMonadExceptOf _ _) (Error.error s!"Expected unsat, got {r}")
 
 syntax (name := reconstruct) "reconstruct" str : tactic
 
@@ -227,13 +245,13 @@ open Lean.Elab Tactic in
     match r with
       | .error e => logInfo (repr e)
       | .ok pf =>
-        let (p, hp, mvs) ← reconstructProof pf (← getFVarNames)
+        let (p, hp, mvs) ← reconstructProof pf (← getUserNames)
         let mv ← Tactic.getMainGoal
         let mv ← mv.assert (Name.num `s 0) p hp
         let (_, mv) ← mv.intro1
         replaceMainGoal (mv :: mvs)
 where
-  getFVarNames : MetaM (HashMap String FVarId) := do
+  getUserNames : MetaM (Std.HashMap String FVarId) := do
     let lCtx ← getLCtx
     return lCtx.getFVarIds.foldl (init := {}) fun m fvarId =>
       m.insert (lCtx.getRoundtrippingUserName? fvarId).get!.toString fvarId
