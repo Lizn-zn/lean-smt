@@ -6,6 +6,8 @@ Authors: Tomaz Gomes Mascarenhas
 -/
 
 import Mathlib.Algebra.Order.Ring.Defs
+-- import Mathlib.Algebra.Order.Ring.Nat
+-- import Mathlib.Data.Nat.Parity
 import Mathlib.Data.Real.Basic
 
 import Smt.Reconstruct.Arith.MulPosNeg.Lemmas
@@ -26,7 +28,7 @@ theorem powNegEven : ∀ {k : Nat} {z : α}, z < 0 → Even k → z ^ k > 0 := b
   | zero    => simp
   | succ k' =>
     have k'NotEven := Nat.even_add_one.mp h₂
-    have k'Odd := Nat.not_even_iff_odd.mp k'NotEven
+    have k'Odd := Nat.odd_iff_not_even.mpr k'NotEven
     have rc := powNegOdd h₁ k'Odd
     simp [Pow.pow]
     have mulZ := arith_mul_neg_lt ⟨h₁, rc⟩
@@ -39,14 +41,14 @@ theorem powNegOdd : ∀ {k : Nat} {z : α}, z < 0 → Odd k → z ^ k < 0 := by
   cases k with
   | zero    => simp at h₂
   | succ k' =>
-    simp only [Odd, add_left_inj] at h₂
-    have k'Even : Even k' := (even_iff_exists_two_nsmul k').mpr h₂
+    simp at h₂
+    have k'Even := of_not_not (mt Nat.even_add_one.mpr h₂)
     have rc := powNegEven h₁ k'Even
-    simp only [gt_iff_lt]
+    simp [Int.pow]
     have mulZ := arith_mul_neg_lt ⟨h₁, rc⟩
-    simp only [mul_zero, gt_iff_lt] at mulZ
+    simp at mulZ
     rw [pow_succ, mul_comm]
-    exact mul_neg_of_neg_of_pos h₁ rc
+    exact mulZ
 
 end
 

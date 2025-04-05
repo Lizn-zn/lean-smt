@@ -16,11 +16,11 @@ open Lean Qq
 
 @[smt_sort_reconstruct] def reconstructBuiltinSort : SortReconstructor := fun s => do match s.getKind with
   | .FUNCTION_SORT =>
-    let ct ← reconstructSort s.getFunctionCodomainSort!
-    let f := fun s a => do
-      let t ← reconstructSort s
-      return .forallE .anonymous t a .default
-    let t ← s.getFunctionDomainSorts!.foldrM f ct
+    let mut ct : Q(Type) ← reconstructSort s.getFunctionCodomainSort
+    let f s (a : Q(Type)) := do
+      let t : Q(Type) ← reconstructSort s
+      return q($t → $a)
+    let t ← s.getFunctionDomainSorts.foldrM f ct
     return t
   | _              => return none
 
@@ -30,7 +30,7 @@ def getFVarExpr! (n : Name) : MetaM Expr := do
   | none   => throwError "unknown free variable '{n}'"
 
 def getFVarOrConstExpr! (n : String) : ReconstructM Expr := do
-  match (← read).userNames[n]? with
+  match (← get).userNames.find? n with
   | some fv => return .fvar fv
   | none   => match (← getLCtx).findFromUserName? n.toName with
     | some d => return d.toExpr
@@ -38,80 +38,75 @@ def getFVarOrConstExpr! (n : String) : ReconstructM Expr := do
       let c ← getConstInfo n.toName
       return .const c.name (c.numLevelParams.repeat (.zero :: ·) [])
 
-def buildDistinct (u : Level) (α : Q(Sort u)) (xs : List Q($α)) : Q(Prop) :=
-  go xs
-where
-  go : List Q($α) → Q(Prop)
-  | [] => q(True)
-  | [_] => q(True)
-  | [x, y] => q($x ≠ $y)
-  | x :: ys => ys.foldr (fun y ys => q($x ≠ $y ∧ $ys)) (go ys)
-
 @[smt_term_reconstruct] def reconstructBuiltin : TermReconstructor := fun t => do match t.getKind with
   | .VARIABLE => getFVarExpr! (getVariableName t)
-  | .CONSTANT => getFVarOrConstExpr! t.getSymbol!
+  | .CONSTANT => getFVarOrConstExpr! t.getSymbol
   | .EQUAL =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort t[0]!.getSort
+    let α : Q(Type) ← reconstructSort t[0]!.getSort
     let x : Q($α) ← reconstructTerm t[0]!
     let y : Q($α) ← reconstructTerm t[1]!
     return q($x = $y)
   | .DISTINCT =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort t[0]!.getSort
-    let xs ← t.getChildren.mapM reconstructTerm
-    return buildDistinct u α xs.toList
+    let n := t.getNumChildren
+    let α : Q(Type) ← reconstructSort t[0]!.getSort
+    let mut xs : Q(List $α) := q([])
+    for i in [0:n] do
+      let x : Q($α) ← reconstructTerm t[n - i - 1]!
+      xs := q($x :: $xs)
+    return q(Builtin.distinct $xs)
   | .ITE =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort t.getSort
+    let α : Q(Type) ← reconstructSort t.getSort
     let c : Q(Prop) ← reconstructTerm t[0]!
     let h : Q(Decidable $c) ← Meta.synthInstance q(Decidable $c)
     let x : Q($α) ← reconstructTerm t[1]!
     let y : Q($α) ← reconstructTerm t[2]!
     return q(@ite $α $c $h $x $y)
-  | .SKOLEM => match t.getSkolemId! with
-    | .PURIFY => reconstructTerm t.getSkolemIndices![0]!
+  | .SKOLEM => match t.getSkolemId with
+    | .PURIFY => reconstructTerm t.getSkolemIndices[0]!
     | _ => return none
   | _ => return none
 where
   getVariableName (t : cvc5.Term) : Name :=
     if t.hasSymbol then
-      if t.getSymbol!.toName == .anonymous then
-        Name.mkSimple t.getSymbol!
+      if t.getSymbol.toName == .anonymous then
+        Name.mkSimple t.getSymbol
       else
-        t.getSymbol!.toName
+        t.getSymbol.toName
     else Name.num `x t.getId
 
 def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
   match pf.getRewriteRule with
   | .DISTINCT_ELIM =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getResult[0]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getResult[0]!.getSort
     let t  : Q($α) ← reconstructTerm pf.getResult[0]!
     let t' : Q($α) ← reconstructTerm pf.getResult[1]!
     addThm q($t = $t') q(Eq.refl $t)
   | .ITE_TRUE_COND =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[1]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[1]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[1]!
     let y : Q($α) ← reconstructTerm pf.getArguments[2]!
     addThm q(ite True $x $y = $x) q(@Builtin.ite_true_cond $α $x $y)
   | .ITE_FALSE_COND =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[1]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[1]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[1]!
     let y : Q($α) ← reconstructTerm pf.getArguments[2]!
     addThm q(ite False $x $y = $y) q(@Builtin.ite_false_cond $α $x $y)
   | .ITE_NOT_COND =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let y : Q($α) ← reconstructTerm pf.getArguments[3]!
     let h : Q(Decidable $c) ← Meta.synthInstance q(Decidable $c)
     addThm q(ite (¬$c) $x $y = ite $c $y $x) q(@Builtin.ite_not_cond $c $α $x $y $h)
   | .ITE_EQ_BRANCH =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let h : Q(Decidable $c) ← Meta.synthInstance q(Decidable $c)
     addThm q(ite $c $x $x = $x) q(@Builtin.ite_eq_branch $c $α $x $h)
   | .ITE_THEN_LOOKAHEAD =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let y : Q($α) ← reconstructTerm pf.getArguments[3]!
     let z : Q($α) ← reconstructTerm pf.getArguments[4]!
@@ -119,7 +114,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     addThm q(ite $c (ite $c $x $y) $z = ite $c $x $z) q(@Builtin.ite_then_lookahead $c $α $x $y $z $h)
   | .ITE_ELSE_LOOKAHEAD =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let y : Q($α) ← reconstructTerm pf.getArguments[3]!
     let z : Q($α) ← reconstructTerm pf.getArguments[4]!
@@ -127,7 +122,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     addThm q(ite $c $x (ite $c $y $z) = ite $c $x $z) q(@Builtin.ite_else_lookahead $c $α $x $y $z $h)
   | .ITE_THEN_NEG_LOOKAHEAD =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let y : Q($α) ← reconstructTerm pf.getArguments[3]!
     let z : Q($α) ← reconstructTerm pf.getArguments[4]!
@@ -135,7 +130,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     addThm q(ite $c (ite (¬$c) $x $y) $z = ite $c $y $z) q(@Builtin.ite_then_neg_lookahead $c $α $x $y $z $h)
   | .ITE_ELSE_NEG_LOOKAHEAD =>
     let c : Q(Prop) ← reconstructTerm pf.getArguments[1]!
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getArguments[2]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getArguments[2]!.getSort
     let x : Q($α) ← reconstructTerm pf.getArguments[2]!
     let y : Q($α) ← reconstructTerm pf.getArguments[3]!
     let z : Q($α) ← reconstructTerm pf.getArguments[4]!
@@ -163,7 +158,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
       mv.assign h₂
     addThm q(andN $ps → $q) q(Builtin.scopes $h₁)
   | .EVALUATE =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getResult[0]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getResult[0]!.getSort
     let t  : Q($α) ← reconstructTerm pf.getResult[0]!
     let t' : Q($α) ← reconstructTerm pf.getResult[1]!
     if pf.getResult[0]! == pf.getResult[1]! then
@@ -175,11 +170,6 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
       addThm q($t = $t') (.app q(@of_decide_eq_true ($t = $t') $h) q(Eq.refl true))
   | .ACI_NORM =>
     addTac (← reconstructTerm pf.getResult) Meta.AC.rewriteUnnormalizedTop
-  | .ENCODE_EQ_INTRO =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getResult[0]!.getSort
-    let x : Q($α) ← reconstructTerm pf.getResult[0]!
-    let y : Q($α) ← reconstructTerm pf.getResult[1]!
-    addThm q($x = $y) q(Eq.refl $y)
   | .DSL_REWRITE
   | .THEORY_REWRITE => reconstructRewrite pf
   | .ITE_ELIM1 =>
@@ -247,7 +237,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     let q : Q(Prop) ← reconstructTerm pf.getArguments[0]![2]!
     addThm q(ite $c $p $q ∨ ¬$p ∨ ¬$q) q(@Builtin.cnfIteNeg3 $c $p $q $h)
   | .SKOLEM_INTRO =>
-    let (u, (α : Q(Sort u))) ← reconstructSortLevelAndSort pf.getResult[0]!.getSort
+    let α : Q(Type) ← reconstructSort pf.getResult[0]!.getSort
     let k : Q($α) ← reconstructTerm pf.getResult[0]!
     let t : Q($α) ← reconstructTerm pf.getResult[1]!
     addThm q($k = $t) q(Eq.refl $t)

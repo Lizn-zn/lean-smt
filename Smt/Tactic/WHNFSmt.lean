@@ -13,8 +13,8 @@ namespace Smt
 open Lean
 
 /-- Constants which SMT knows about and we thus don't want to unfold. -/
-def smtConsts : Std.HashSet Name :=
-  List.foldr (fun c s => s.insert c) {}
+def smtConsts : HashSet Name :=
+  List.foldr (fun c s => s.insert c) HashSet.empty
   [
     ``Eq,
     ``BEq.beq,
@@ -94,21 +94,22 @@ def smtConsts : Std.HashSet Name :=
     ``UInt32.shiftRight
   ]
 
-def opaquePred (opaqueConsts : Std.HashSet Name) (_ : Meta.Config) (ci : ConstantInfo) : CoreM Bool := do
+def opaquePred (opaqueConsts : HashSet Name) (_ : Meta.Config) (ci : ConstantInfo) : CoreM Bool := do
   if smtConsts.contains ci.name || opaqueConsts.contains ci.name then
     return false
   return true
 
 /-- Runs type-theoretic reduction, but never unfolding SMT builtins and with extra rules
-to let-lift `let-opaque` bindings. This can produce linearly-sized terms in certain cases.
+to let-lift `let-opaque` bindings. This can produce linearly-sized terms in certain cases. 
 
 Constants with names in `opaqueConsts` are also not unfolded. -/
-def smtOpaqueReduce (e : Expr) (opaqueConsts : Std.HashSet Name := {}) : MetaM Expr :=
-  Meta.withCanUnfoldPred (opaquePred opaqueConsts) <|
-  Smt.reduce (skipTypes := false) e |>.run {
+def smtOpaqueReduce (e : Expr) (opaqueConsts : HashSet Name := {}) : MetaM Expr :=
+  withTheReader Meta.Context (fun ctx => { ctx with
+    canUnfold? := some (opaquePred opaqueConsts)
+  }) do Smt.reduce (skipTypes := false) e |>.run {
     letPushElim := true
   }
-
+  
 open Parser in
 syntax (name := «let_opaque») withPosition("let_opaque " letDecl) optional(";") term : term
 

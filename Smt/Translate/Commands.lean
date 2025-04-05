@@ -29,16 +29,15 @@ inductive Command where
 
 namespace Command
 
-open Lean Term
+open Lean
+open Term
+open scoped Term.Notation
 
-def defNat : Command := .defineSort "Nat" [] (symbolT "Int")
+def defNat : Command := .defineSort "Nat" [] (`"Int")
 
 def defNatSub : Command :=
-  .defineFun "Nat.sub" [("x", symbolT "Nat"), ("y", symbolT "Nat")] (symbolT "Nat")
-    (Term.mkApp3 (symbolT "ite")
-                 (Term.mkApp2 (symbolT "<") (symbolT "x") (symbolT "y"))
-                 (literalT "0")
-                 (Term.mkApp2 (symbolT "-") (symbolT "x") (symbolT "y")))
+  .defineFun "Nat.sub" [("x", `"Nat"), ("y", `"Nat")] (`"Nat")
+    (`"ite" • (`"<" • `"x" • `"y") • ``"0" • (`"-" • `"x" • `"y"))
     false
 
 open ToSexp in

@@ -5,6 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Tomaz Gomes Mascarenhas
 -/
 
+import Mathlib.Init.Function
 import Mathlib.Data.Real.Basic
 
 namespace Smt.Reconstruct.Arith

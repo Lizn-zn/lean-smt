@@ -31,15 +31,24 @@ inductive Term where
   deriving Inhabited
 
 namespace Term
+namespace Notation
+
+scoped infixl:20 " • "  => appT
+scoped prefix:21 " ` "  => symbolT
+scoped prefix:21 " `` " => literalT
+
+end Notation
+
+open scoped Notation
 
 def mkApp2 (f a b : Term) : Term :=
-  appT (appT f a) b
+  f • a • b
 
 def mkApp3 (f a b c : Term) : Term :=
-  appT (appT (appT f a) b) c
+  f • a • b • c
 
 def mkApp4 (f a b c d : Term) : Term :=
-  appT (appT (appT (appT f a) b) c) d
+  f • a • b • c • d
 
 /-- SMT-LIBv2 quoting for symbols. -/
 def quoteSymbol (s : String) : String :=

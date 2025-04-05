@@ -7,16 +7,15 @@ Authors: Abdalrhman Mohamed
 
 import Lean
 
+import Smt.Reconstruct.Prop.Core
+
 namespace BitVec
 
 def bb (x : BitVec w) : BitVec w :=
-  (iunfoldr (fun i _ => ((), x.getLsbD i)) ()).snd
+  (iunfoldr (fun i _ => ((), x.getLsb i)) ()).snd
 
-theorem self_eq_bb (x : BitVec w) : x = x.bb := by
-  unfold bb
-  rw [iunfoldr_replace_snd (λ _ => ()) (init:=rfl)]
-  intro i
-  rfl
+def self_eq_bb (x : BitVec w) : x = x.bb :=
+  sorry
 
 -- def beq (x : BitVec w) (y : BitVec w) : Bool :=
 --   go w
@@ -30,8 +29,8 @@ def beq (x : BitVec w) (y : BitVec w) : Bool :=
   go (w - 1)
 where
   go : Nat → Bool
-    | 0     => x.getLsbD (w - 1) == y.getLsbD (w - 1)
-    | i + 1 => x.getLsbD ((w - 1) - (i + 1)) == y.getLsbD ((w - 1) - (i + 1)) && go i
+    | 0     => x.getLsb (w - 1) == y.getLsb (w - 1)
+    | i + 1 => x.getLsb ((w - 1) - (i + 1)) == y.getLsb ((w - 1) - (i + 1)) && go i
 
 def eq_eq_beq (x : BitVec w) (y : BitVec w) : (x = y) = x.beq y :=
   sorry
@@ -45,11 +44,11 @@ theorem adcb_eq_adcb' : adcb = adcb' := by
 
 /-- Bitwise addition implemented via a ripple carry adder. -/
 def adc' (x y : BitVec w) : Bool → Bool × BitVec w :=
-  iunfoldr fun (i : Fin w) c => adcb' (x.getLsbD i) (y.getLsbD i) c
+  iunfoldr fun (i : Fin w) c => adcb' (x.getLsb i) (y.getLsb i) c
 
 theorem adc_eq_adc' : @adc = @adc' := by
   funext x y c
-  rw [adc, adc', adcb_eq_adcb']
+  simp only [adc, adc', adcb_eq_adcb']
 
 theorem add_eq_adc' (x y : BitVec w) : x + y = (adc' x y false).snd := by
   rw [add_eq_adc, adc_eq_adc']
