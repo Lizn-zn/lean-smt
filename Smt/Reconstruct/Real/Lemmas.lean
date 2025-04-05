@@ -52,15 +52,14 @@ theorem sum_ub₈ (h₁ : a = b) (h₂ : c ≤ d) : a + c ≤ b + d := by
   rewrite [h₁]
   exact add_le_add_left h₂ b
 
-theorem sum_ub₉ (h₁ : a = b) (h₂ : c = d) : a + c ≤ b + d := by
-  rewrite [h₁, h₂]
-  exact le_refl (b + d)
+theorem sum_ub₉ (h₁ : a = b) (h₂ : c = d) : a + c = b + d := by
+  rw [h₁, h₂]
 
-theorem int_tight_ub {i : Int} (h : i < c) : i ≤ ⌊c⌋ :=
-  Int.le_floor.mpr (le_of_lt h)
+theorem int_tight_ub {i : Int} (h : i < c) : i ≤ ⌈c⌉ - 1 :=
+  Int.le_of_lt_add_one (Int.sub_add_cancel _ _ ▸ Int.lt_ceil.mpr h)
 
-theorem int_tight_lb {i : Int} (h : i > c) : i ≥ ⌈c⌉ :=
-  Int.ceil_le.mpr (le_of_lt h)
+theorem int_tight_lb {i : Int} (h : i > c) : i ≥ ⌊c⌋ + 1 :=
+  Int.add_one_le_of_lt (Int.floor_lt.mpr h)
 
 theorem trichotomy₁ (h₁ : a ≤ b) (h₂ : a ≠ b) : a < b := by
   have tr := lt_trichotomy a b
@@ -160,6 +159,96 @@ theorem gt_of_sub_eq_pos {c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0
 theorem gt_of_sub_eq_neg {c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * (a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ > a₂) = (b₁ > b₂) := by
   rewrite [← mul_right_inj' (by norm_num : (-1 : Real) ≠ 0), ← mul_assoc (-1), ← mul_assoc (-1)] at h
   apply gt_of_sub_eq_pos (by linarith) (by linarith) h
+
+theorem lt_of_sub_eq_pos_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ < a₂) = (b₁ < b₂) := by
+  zify at h
+  have hc : (a₁ < a₂) = ((↑a₁ : Real) < ↑a₂) := by simp
+  simp only [lt_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem lt_of_sub_eq_neg_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ < a₂) = (b₁ < b₂) := by
+  zify at h
+  have hc : (a₁ < a₂) = ((↑a₁ : Real) < ↑a₂) := by simp
+  simp only [lt_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem le_of_sub_eq_pos_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ ≤ a₂) = (b₁ ≤ b₂) := by
+  zify at h
+  have hc : (a₁ ≤ a₂) = ((↑a₁ : Real) ≤ ↑a₂) := by simp
+  simp only [le_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem le_of_sub_eq_neg_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ ≤ a₂) = (b₁ ≤ b₂) := by
+  zify at h
+  have hc : (a₁ ≤ a₂) = ((↑a₁ : Real) ≤ ↑a₂) := by simp
+  simp only [le_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem eq_of_sub_eq_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ ≠ 0) (hc₂ : c₂ ≠ 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ = a₂) = (b₁ = b₂) := by
+  zify at h
+  have hc : (a₁ = a₂) = ((↑a₁ : Real) = ↑a₂) := by simp
+  simp only [eq_of_sub_eq hc₁ hc₂ h, hc]
+
+theorem ge_of_sub_eq_pos_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ ≥ a₂) = (b₁ ≥ b₂) := by
+  zify at h
+  have hc : (a₁ ≥ a₂) = ((↑a₁ : Real) ≥ ↑a₂) := by simp
+  simp only [ge_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem ge_of_sub_eq_neg_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ ≥ a₂) = (b₁ ≥ b₂) := by
+  zify at h
+  have hc : (a₁ ≥ a₂) = ((↑a₁ : Real) ≥ ↑a₂) := by simp
+  simp only [ge_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem gt_of_sub_eq_pos_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ > a₂) = (b₁ > b₂) := by
+  zify at h
+  have hc : (a₁ > a₂) = ((↑a₁ : Real) > ↑a₂) := by simp
+  simp only [gt_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem gt_of_sub_eq_neg_int_left {a₁ a₂ : Int} {b₁ b₂ c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * ↑(a₁ - a₂) = c₂ * (b₁ - b₂)) : (a₁ > a₂) = (b₁ > b₂) := by
+  zify at h
+  have hc : (a₁ > a₂) = ((↑a₁ : Real) > ↑a₂) := by simp
+  simp only [gt_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem lt_of_sub_eq_pos_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ < a₂) = (b₁ < b₂) := by
+  zify at h
+  have hc : (b₁ < b₂) = ((↑b₁ : Real) < ↑b₂) := by simp
+  simp only [lt_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem lt_of_sub_eq_neg_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ < a₂) = (b₁ < b₂) := by
+  zify at h
+  have hc : (b₁ < b₂) = ((↑b₁ : Real) < ↑b₂) := by simp
+  simp only [lt_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem le_of_sub_eq_pos_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ ≤ a₂) = (b₁ ≤ b₂) := by
+  zify at h
+  have hc : (b₁ ≤ b₂) = ((↑b₁ : Real) ≤ ↑b₂) := by simp
+  simp only [le_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem le_of_sub_eq_neg_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ ≤ a₂) = (b₁ ≤ b₂) := by
+  zify at h
+  have hc : (b₁ ≤ b₂) = ((↑b₁ : Real) ≤ ↑b₂) := by simp
+  simp only [le_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem eq_of_sub_eq_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ ≠ 0) (hc₂ : c₂ ≠ 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ = a₂) = (b₁ = b₂) := by
+  zify at h
+  have hc : (b₁ = b₂) = ((↑b₁ : Real) = ↑b₂) := by simp
+  simp only [eq_of_sub_eq hc₁ hc₂ h, hc]
+
+theorem ge_of_sub_eq_pos_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ ≥ a₂) = (b₁ ≥ b₂) := by
+  zify at h
+  have hc : (b₁ ≥ b₂) = ((↑b₁ : Real) ≥ ↑b₂) := by simp
+  simp only [ge_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem ge_of_sub_eq_neg_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ ≥ a₂) = (b₁ ≥ b₂) := by
+  zify at h
+  have hc : (b₁ ≥ b₂) = ((↑b₁ : Real) ≥ ↑b₂) := by simp
+  simp only [ge_of_sub_eq_neg hc₁ hc₂ h, hc]
+
+theorem gt_of_sub_eq_pos_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ > 0) (hc₂ : c₂ > 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ > a₂) = (b₁ > b₂) := by
+  zify at h
+  have hc : (b₁ > b₂) = ((↑b₁ : Real) > ↑b₂) := by simp
+  simp only [gt_of_sub_eq_pos hc₁ hc₂ h, hc]
+
+theorem gt_of_sub_eq_neg_int_right {a₁ a₂ : Real} {b₁ b₂ : Int} {c₁ c₂ : Real} (hc₁ : c₁ < 0) (hc₂ : c₂ < 0) (h : c₁ * (a₁ - a₂) = c₂ * ↑(b₁ - b₂)) : (a₁ > a₂) = (b₁ > b₂) := by
+  zify at h
+  have hc : (b₁ > b₂) = ((↑b₁ : Real) > ↑b₂) := by simp
+  simp only [gt_of_sub_eq_neg hc₁ hc₂ h, hc]
 
 theorem mul_sign₁ (ha : a < 0) (hb : b < 0) : a * b > 0 := by
   have h := mul_lt_mul_of_neg_right ha hb

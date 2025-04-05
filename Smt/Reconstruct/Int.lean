@@ -7,6 +7,7 @@ Authors: Abdalrhman Mohamed
 
 import Smt.Reconstruct
 import Smt.Reconstruct.Builtin.Lemmas
+import Smt.Reconstruct.Int.Core
 import Smt.Reconstruct.Int.Lemmas
 import Smt.Reconstruct.Int.Polynorm
 import Smt.Reconstruct.Int.Rewrites
@@ -22,12 +23,12 @@ open Qq
   | _             => return none
 
 @[smt_term_reconstruct] def reconstructInt : TermReconstructor := fun t => do match t.getKind with
-  | .SKOLEM => match t.getSkolemId with
+  | .SKOLEM => match t.getSkolemId! with
     | .INT_DIV_BY_ZERO => return q(fun (x : Int) => x / 0)
     | .MOD_BY_ZERO => return q(fun (x : Int) => x % 0)
     | _ => return none
   | .CONST_INTEGER =>
-    let x : Int := t.getIntegerValue
+    let x : Int := t.getIntegerValue!
     let x' : Q(Nat) := mkRawNatLit x.natAbs
     if x ≥ 0 then
       return q(OfNat.ofNat $x' : Int)
@@ -92,10 +93,12 @@ where
 
 def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
   match pf.getRewriteRule with
-  | .ARITH_PLUS_ZERO =>
-    if !pf.getArguments[1]![0]!.getSort.isInteger then return none
-    let args ← reconstructArgs pf.getArguments[1:]
-    addTac (← reconstructTerm pf.getResult) (Tactic.smtRw · q(@HAdd.hAdd Int Int Int _) q(0 : Int) q(@Rewrite.plus_zero) args)
+  | .ARITH_POW_ELIM =>
+    if !pf.getResult[0]![0]!.getSort.isInteger then return none
+    let x : Q(Int) ← reconstructTerm pf.getResult[0]![0]!
+    let c : Q(Nat) ← reconstructTerm pf.getResult[0]![1]!
+    let y : Q(Int) ← reconstructTerm pf.getResult[1]!
+    addThm q($x ^ $c = $y) q(Eq.refl ($x ^ $c))
   | .ARITH_MUL_ONE =>
     if !pf.getArguments[1]![0]!.getSort.isInteger then return none
     let args ← reconstructArgs pf.getArguments[1:]
@@ -108,37 +111,24 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
     let h : Q($s ≠ 0) ← reconstructProof pf.getChildren[0]!
-    addThm q($t / $s = $t / $s) q(@Rewrite.int_div_total $t $s $h)
+    addThm q($t / $s = $t / $s) q(@Rewrite.div_total $t $s $h)
   | .ARITH_INT_DIV_TOTAL_ONE =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q($t / 1 = $t) q(@Rewrite.int_div_total_one $t)
+    addThm q($t / 1 = $t) q(@Rewrite.div_total_one $t)
   | .ARITH_INT_DIV_TOTAL_ZERO =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q($t / 0 = 0) q(@Rewrite.int_div_total_zero $t)
+    addThm q($t / 0 = 0) q(@Rewrite.div_total_zero $t)
   | .ARITH_INT_MOD_TOTAL =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
     let h : Q($s ≠ 0) ← reconstructProof pf.getChildren[0]!
-    addThm q($t % $s = $t % $s) q(@Rewrite.int_mod_total $t $s $h)
+    addThm q($t % $s = $t % $s) q(@Rewrite.mod_total $t $s $h)
   | .ARITH_INT_MOD_TOTAL_ONE =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q($t % 1 = 0) q(@Rewrite.int_mod_total_one $t)
+    addThm q($t % 1 = 0) q(@Rewrite.mod_total_one $t)
   | .ARITH_INT_MOD_TOTAL_ZERO =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q($t % 0 = $t) q(@Rewrite.int_mod_total_zero $t)
-  | .ARITH_NEG_NEG_ONE =>
-    if !pf.getArguments[1]!.getSort.isInteger then return none
-    let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q(-1 * (-1 * $t) = $t) q(@Rewrite.neg_neg_one $t)
-  | .ARITH_ELIM_UMINUS =>
-    if !pf.getArguments[1]!.getSort.isInteger then return none
-    let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    addThm q(-$t = -1 * $t) q(@Rewrite.elim_uminus $t)
-  | .ARITH_ELIM_MINUS =>
-    if !pf.getArguments[1]!.getSort.isInteger then return none
-    let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
-    let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
-    addThm q($t - $s = $t + -1 * $s) q(@Rewrite.elim_minus $t $s)
+    addThm q($t % 0 = $t) q(@Rewrite.mod_total_zero $t)
   | .ARITH_ELIM_GT =>
     if !pf.getArguments[1]!.getSort.isInteger then return none
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
@@ -152,11 +142,11 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
   | .ARITH_ELIM_INT_GT =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
-    addThm q(($t > $s) = ($t ≥ $s + 1)) q(@Rewrite.elim_int_gt $t $s)
+    addThm q(($t > $s) = ($t ≥ $s + 1)) q(@Rewrite.elim_gt_add_one $t $s)
   | .ARITH_ELIM_INT_LT =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
-    addThm q(($t < $s) = ($s ≥ $t + 1)) q(@Rewrite.elim_int_lt $t $s)
+    addThm q(($t < $s) = ($s ≥ $t + 1)) q(@Rewrite.elim_lt_add_one $t $s)
   | .ARITH_ELIM_LEQ =>
     if !pf.getArguments[1]!.getSort.isInteger then return none
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
@@ -170,8 +160,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
     addThm q((¬($t ≥ $s)) = ($s ≥ $t + 1)) q(@Rewrite.geq_tighten $t $s)
-  | .ARITH_GEQ_NORM1 =>
-    if !pf.getArguments[1]!.getSort.isInteger then return none
+  | .ARITH_GEQ_NORM1_INT =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
     addThm q(($t ≥ $s) = ($t - $s ≥ 0)) q(@Rewrite.geq_norm1 $t $s)
@@ -196,6 +185,10 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     if !pf.getArguments[1]!.getSort.isInteger then return none
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     addThm q(($t > $t) = False) q(@Rewrite.refl_gt $t)
+  | .ARITH_EQ_ELIM_INT =>
+    let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
+    let s : Q(Int) ← reconstructTerm pf.getArguments[2]!
+    addThm q(($t = $s) = ($t ≥ $s ∧ $t ≤ $s)) q(@Rewrite.eq_elim $t $s)
   | .ARITH_PLUS_FLATTEN =>
     if !pf.getArguments[2]!.getSort.isInteger then return none
     let args ← reconstructArgs pf.getArguments[1:]
@@ -208,16 +201,7 @@ def reconstructRewrite (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
     if !pf.getArguments[2]!.getSort.isInteger then return none
     let args ← reconstructArgs pf.getArguments[1:]
     addTac (← reconstructTerm pf.getResult) (Tactic.smtRw · q(@HMul.hMul Int Int Int _) q(1 : Int) q(@Rewrite.mult_dist) args)
-  | .ARITH_PLUS_CANCEL1 =>
-    if !pf.getArguments[2]!.getSort.isInteger then return none
-    let args ← reconstructArgs pf.getArguments[1:]
-    addTac (← reconstructTerm pf.getResult) (Tactic.smtRw · q(@HAdd.hAdd Int Int Int _) q(0 : Int) q(@Rewrite.plus_cancel1) args)
-  | .ARITH_PLUS_CANCEL2 =>
-    if !pf.getArguments[2]!.getSort.isInteger then return none
-    let args ← reconstructArgs pf.getArguments[1:]
-    addTac (← reconstructTerm pf.getResult) (Tactic.smtRw · q(@HAdd.hAdd Int Int Int _) q(0 : Int) q(@Rewrite.plus_cancel2) args)
-  | .ARITH_ABS_ELIM =>
-    if !pf.getArguments[1]!.getSort.isInteger then return none
+  | .ARITH_ABS_ELIM_INT =>
     let t : Q(Int) ← reconstructTerm pf.getArguments[1]!
     addThm q(ite ($t < 0) (-$t) $t = ite ($t < 0) (-$t) $t) q(@Rewrite.abs_elim $t)
   | _ => return none
@@ -278,18 +262,18 @@ def reconstructSumUB (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
       let h : Q($l = $r) ← reconstructProof p
       return (.EQUAL, lsl, rsr, q(Int.sum_ub₉ $hs $h))
     else
-      throwError "[sum_ub]: invalid kinds: {ks}, {p.getResult.getKind}"
+      throwError "[sum_ub]: invalid kinds: {ks}, {k}"
   let k := pf.getChildren[0]!.getResult.getKind
   let ls : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[0]!
   let rs : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[1]!
   let hs ← reconstructProof pf.getChildren[0]!
-  let (_, ls, rs, hs) ← pf.getChildren[1:].foldlM f (k, ls, rs, hs)
-  addThm q($ls < $rs) hs
+  let (ks, ls, rs, hs) ← pf.getChildren[1:].foldlM f (k, ls, rs, hs)
+  addThm (if ks == .LT then q($ls < $rs) else q($ls ≤ $rs)) hs
 
 def reconstructMulSign (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
   let ts := pf.getResult[0]!.getChildren
   let mut hs : Array (Name × (Array Expr → ReconstructM Expr)) := #[]
-  let mut map : HashMap cvc5.Term Nat := {}
+  let mut map : Std.HashMap cvc5.Term Nat := {}
   for h : i in [0:ts.size] do
     let t := ts[i]'(h.right)
     let p : Q(Prop) ← reconstructTerm t
@@ -303,48 +287,78 @@ def reconstructMulSign (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
   let ps : Q(List Prop) ← ts.foldrM f q([])
   let q : Q(Prop) ← reconstructTerm t
   let h : Q(impliesN $ps $q) ← Meta.withLocalDeclsD hs fun hs => do
-    let h : Q($q) ← if ts[map.find! vs[0]!]!.getKind == .NOT then
+    let h : Q($q) ← if ts[map[vs[0]!]!]!.getKind == .NOT then
         let a : Q(Int) ← reconstructTerm vs[0]!
-        let ha : Q($a ≠ 0) := hs[map.find! vs[0]!]!
+        let ha : Q($a ≠ 0) := hs[map[vs[0]!]!]!
         go vs ts hs map .GT q($a * $a) q(Int.mul_sign₀ $ha) 2
       else
         let a : Q(Int) ← reconstructTerm vs[0]!
-        go vs ts hs map ts[map.find! vs[0]!]!.getKind a hs[map.find! vs[0]!]! 1
+        go vs ts hs map ts[map[vs[0]!]!]!.getKind a hs[map[vs[0]!]!]! 1
     Meta.mkLambdaFVars hs h
   addThm q(andN $ps → $q) q(Builtin.scopes $h)
 where
-  go vs ts hs map ka (a : Q(Int)) (ha : Expr) i : ReconstructM Expr := do
+  go vs ts hs map (ka : cvc5.Kind) (a : Q(Int)) (ha : Expr) i : ReconstructM Expr := do
     if hi : i < vs.size then
       let b : Q(Int) ← reconstructTerm vs[i]
-      let k := ts[map.find! vs[i]]!.getKind
+      let k : cvc5.Kind := ts[map[vs[i]]!]!.getKind
       if ka == .LT && k == .LT then
         let ha : Q($a < 0) := ha
-        let hb : Q($b < 0) := hs[map.find! vs[i]]!
+        let hb : Q($b < 0) := hs[map[vs[i]]!]!
         go vs ts hs map .GT q($a * $b) q(Int.mul_sign₁ $ha $hb) (i + 1)
       else if ka == .LT && k == .NOT then
         let ha : Q($a < 0) := ha
-        let hb : Q($b ≠ 0) := hs[map.find! vs[i]]!
+        let hb : Q($b ≠ 0) := hs[map[vs[i]]!]!
         go vs ts hs map .LT q($a * $b * $b) q(Int.mul_sign₂ $ha $hb) (i + 2)
       else if ka == .LT && k == .GT then
         let ha : Q($a < 0) := ha
-        let hb : Q($b > 0) := hs[map.find! vs[i]]!
+        let hb : Q($b > 0) := hs[map[vs[i]]!]!
         go vs ts hs map .LT q($a * $b) q(Int.mul_sign₃ $ha $hb) (i + 1)
       else if ka == .GT && k == .LT then
         let ha : Q($a > 0) := ha
-        let hb : Q($b < 0) := hs[map.find! vs[i]]!
+        let hb : Q($b < 0) := hs[map[vs[i]]!]!
         go vs ts hs map .LT q($a * $b) q(Int.mul_sign₄ $ha $hb) (i + 1)
       else if ka == .GT && k == .NOT then
         let ha : Q($a > 0) := ha
-        let hb : Q($b ≠ 0) := hs[map.find! vs[i]]!
+        let hb : Q($b ≠ 0) := hs[map[vs[i]]!]!
         go vs ts hs map .GT q($a * $b * $b) q(Int.mul_sign₅ $ha $hb) (i + 2)
       else if ka == .GT && k == .GT then
         let ha : Q($a > 0) := ha
-        let hb : Q($b > 0) := hs[map.find! vs[i]]!
+        let hb : Q($b > 0) := hs[map[vs[i]]!]!
         go vs ts hs map .GT q($a * $b) q(Int.mul_sign₆ $ha $hb) (i + 1)
       else
         throwError "[mul_sign]: invalid kinds: {ka}, {k}"
     else
       return ha
+
+def reconstructArithPolyNormRel (pf : cvc5.Proof) : ReconstructM (Option Expr) := do
+  let cx : Int := pf.getChildren[0]!.getResult[0]![0]!.getIntegerValue!
+  let cy : Int := pf.getChildren[0]!.getResult[1]![0]!.getIntegerValue!
+  let x₁ : Q(Int) ← reconstructTerm pf.getResult[0]![0]!
+  let x₂ : Q(Int) ← reconstructTerm pf.getResult[0]![1]!
+  let y₁ : Q(Int) ← reconstructTerm pf.getResult[1]![0]!
+  let y₂ : Q(Int) ← reconstructTerm pf.getResult[1]![1]!
+  let h : Q($cx * ($x₁ - $x₂) = $cy * ($y₁ - $y₂)) ← reconstructProof pf.getChildren[0]!
+  let k := pf.getResult[0]!.getKind
+  let (hcx, hcy) :=
+    if k == .EQUAL then (q(@of_decide_eq_true ($cx ≠ 0) _), q(@of_decide_eq_true ($cy ≠ 0) _))
+    else if cx > 0 then (q(@of_decide_eq_true ($cx > 0) _), q(@of_decide_eq_true ($cy > 0) _))
+    else (q(@of_decide_eq_true ($cx < 0) _), q(@of_decide_eq_true ($cy < 0) _))
+  let hcx := .app hcx q(Eq.refl true)
+  let hcy := .app hcy q(Eq.refl true)
+  let n ← getThmName k (cx > 0)
+  return mkApp9 (.const n []) x₁ x₂ y₁ y₂ q($cx) q($cy) hcx hcy h
+where
+  getThmName (k : cvc5.Kind) (sign : Bool) : ReconstructM Name :=
+    if k == .LT && sign == true then pure ``Int.lt_of_sub_eq_pos
+    else if k == .LT && sign == false then pure ``Int.lt_of_sub_eq_neg
+    else if k == .LEQ && sign == true then pure ``Int.le_of_sub_eq_pos
+    else if k == .LEQ && sign == false then pure ``Int.le_of_sub_eq_neg
+    else if k == .EQUAL then pure ``Int.eq_of_sub_eq
+    else if k == .GEQ && sign == true then pure ``Int.ge_of_sub_eq_pos
+    else if k == .GEQ && sign == false then pure ``Int.ge_of_sub_eq_neg
+    else if k == .GT && sign == true then pure ``Int.gt_of_sub_eq_pos
+    else if k == .GT && sign == false then pure ``Int.gt_of_sub_eq_neg
+    else throwError "[arith_poly_norm_rel]: invalid combination of kind and sign: {k}, {sign}"
 
 @[smt_proof_reconstruct] def reconstructIntProof : ProofReconstructor := fun pf => do match pf.getRule with
   | .DSL_REWRITE
@@ -353,13 +367,13 @@ where
     if !pf.getResult[0]!.getSort.isInteger then return none
     reconstructSumUB pf
   | .INT_TIGHT_UB =>
-    if !pf.getResult[0]!.getSort.isInteger then return none
+    if !pf.getChildren[0]!.getResult[1]!.getSort.isInteger then return none
     let i : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[0]!
     let c : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[1]!
     let h : Q($i < $c) ← reconstructProof pf.getChildren[0]!
     addThm q($i ≤ $c - 1) q(@Int.int_tight_ub $c $i $h)
   | .INT_TIGHT_LB =>
-    if !pf.getResult[0]!.getSort.isInteger then return none
+    if !pf.getChildren[0]!.getResult[1]!.getSort.isInteger then return none
     let i : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[0]!
     let c : Q(Int) ← reconstructTerm pf.getChildren[0]!.getResult[1]!
     let h : Q($i > $c) ← reconstructProof pf.getChildren[0]!
@@ -402,45 +416,8 @@ where
     let b : Q(Int) ← reconstructTerm pf.getResult[1]!
     addTac q($a = $b) Int.polyNorm
   | .ARITH_POLY_NORM_REL =>
-    if !pf.getResult[0]![0]!.getSort.isInteger then return none
-    let cx : Int := pf.getChildren[0]!.getResult[0]![0]!.getIntegerValue
-    let x₁ : Q(Int) ← reconstructTerm pf.getResult[0]![0]!
-    let x₂ : Q(Int) ← reconstructTerm pf.getResult[0]![1]!
-    let cy : Int := pf.getChildren[0]!.getResult[1]![0]!.getIntegerValue
-    let y₁ : Q(Int) ← reconstructTerm pf.getResult[1]![0]!
-    let y₂ : Q(Int) ← reconstructTerm pf.getResult[1]![1]!
-    let h : Q($cx * ($x₁ - $x₂) = $cy * ($y₁ - $y₂)) ← reconstructProof pf.getChildren[0]!
-    let k := pf.getResult[0]!.getKind
-    if k == .EQUAL then
-      let hcx : Q($cx ≠ 0) := .app q(@of_decide_eq_true ($cx ≠ 0) _) q(Eq.refl true)
-      let hcy : Q($cy ≠ 0) := .app q(@of_decide_eq_true ($cy ≠ 0) _) q(Eq.refl true)
-      addThm q(($x₁ = $x₂) = ($y₁ = $y₂)) q(Int.eq_of_sub_eq $hcx $hcy $h)
-    else if cx > 0 then
-      let hcx : Q($cx > 0) := .app q(@of_decide_eq_true ($cx > 0) _) q(Eq.refl true)
-      let hcy : Q($cy > 0) := .app q(@of_decide_eq_true ($cy > 0) _) q(Eq.refl true)
-      match k with
-      | .LT =>
-        addThm q(($x₁ < $x₂) = ($y₁ < $y₂)) q(Int.lt_of_sub_eq_pos $hcx $hcy $h)
-      | .LEQ =>
-        addThm q(($x₁ ≤ $x₂) = ($y₁ ≤ $y₂)) q(Int.le_of_sub_eq_pos $hcx $hcy $h)
-      | .GEQ =>
-        addThm q(($x₁ ≥ $x₂) = ($y₁ ≥ $y₂)) q(Int.ge_of_sub_eq_pos $hcx $hcy $h)
-      | .GT =>
-        addThm q(($x₁ > $x₂) = ($y₁ > $y₂)) q(Int.gt_of_sub_eq_pos $hcx $hcy $h)
-      | _   => return none
-    else
-      let hcx : Q($cx < 0) := .app q(@of_decide_eq_true ($cx < 0) _) q(Eq.refl true)
-      let hcy : Q($cy < 0) := .app q(@of_decide_eq_true ($cy < 0) _) q(Eq.refl true)
-      match k with
-      | .LT =>
-        addThm q(($x₁ < $x₂) = ($y₁ < $y₂)) q(Int.lt_of_sub_eq_neg $hcx $hcy $h)
-      | .LEQ =>
-        addThm q(($x₁ ≤ $x₂) = ($y₁ ≤ $y₂)) q(Int.le_of_sub_eq_neg $hcx $hcy $h)
-      | .GEQ =>
-        addThm q(($x₁ ≥ $x₂) = ($y₁ ≥ $y₂)) q(Int.ge_of_sub_eq_neg $hcx $hcy $h)
-      | .GT =>
-        addThm q(($x₁ > $x₂) = ($y₁ > $y₂)) q(Int.gt_of_sub_eq_neg $hcx $hcy $h)
-      | _   => return none
+    if !pf.getChildren[0]!.getResult[0]![0]!.getSort.isInteger then return none
+    reconstructArithPolyNormRel pf
   | .ARITH_MULT_SIGN =>
     if !pf.getResult[1]![0]!.getSort.isInteger then return none
     reconstructMulSign pf

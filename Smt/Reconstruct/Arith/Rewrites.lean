@@ -24,7 +24,7 @@ theorem arith_div_by_const_elim_real_pos {t c₁ c₂ : Real} : t / (c₁ / c₂
 theorem arith_div_by_const_elim_real_neg {t c₁ c₂ : Real} : t / (-c₁ / c₂) = t * (-c₂ / c₁) :=
   div_eq_mul_one_div t (-c₁ / c₂) ▸ one_div_div (-c₁) c₂ ▸ div_neg c₂ ▸ neg_div c₁ c₂ ▸ rfl
 
--- https://github.com/cvc5/cvc5/blob/proof-new/src/theory/arith/rewrites
+-- https://github.com/cvc5/cvc5/blob/main/src/theory/arith/rewrites
 
 variable {α : Type} [h : LinearOrderedRing α]
 
@@ -69,9 +69,9 @@ theorem arith_elim_gt : (t > s) = ¬(t ≤ s) :=
 theorem arith_elim_lt : (t < s) = ¬(t ≥ s) :=
   propext not_le.symm
 theorem arith_elim_int_gt {t s : Int} : (t > s) = (t ≥ s + 1) :=
-  propext (Int.lt_iff_add_one_le s t)
+  propext Int.lt_iff_add_one_le
 theorem arith_elim_int_lt {t s : Int} : (t < s) = (s ≥ t + 1) :=
-  propext (Int.lt_iff_add_one_le t s)
+  propext Int.lt_iff_add_one_le
 theorem arith_elim_leq : (t ≤ s) = (s ≥ t) :=
   propext ge_iff_le
 

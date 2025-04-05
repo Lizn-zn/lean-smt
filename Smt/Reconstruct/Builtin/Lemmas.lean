@@ -5,15 +5,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Abdalrhman Mohamed
 -/
 
-import Smt.Reconstruct.Util
+import Smt.Reconstruct.Prop.Core
 
 namespace Smt.Reconstruct.Builtin
-
-@[reducible] def distinct : List α → Prop
-  | []      => True
-  | [_]     => True
-  | [x, y]  => x ≠ y
-  | x :: ys => ys.foldr (x ≠ · ∧ ·) (distinct ys)
 
 theorem iteElim1 [hc : Decidable c] : ite c a b → ¬ c ∨ a := by
   intros h

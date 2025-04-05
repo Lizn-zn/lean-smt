@@ -7,12 +7,24 @@ Authors: Abdalrhman Mohamed
 
 namespace Smt.Reconstruct.UF
 
--- https://github.com/cvc5/cvc5/blob/proof-new/src/theory/uf/rewrites
+-- https://github.com/cvc5/cvc5/blob/main/src/theory/uf/rewrites
+
+variable {c : Prop} [h : Decidable c] {t s r : α}
 
 -- Equality
 
 theorem eq_refl : (t = t) = True := eq_self t
 theorem eq_symm : (t = s) = (s = t) := propext ⟨(· ▸ rfl), (· ▸ rfl)⟩
+
+theorem eq_cond_deq (h : (s = r) = False) : ((t = s) = (t = r)) = (¬t = s ∧ ¬t = r) :=
+  propext <| Iff.intro
+    (fun hsr => And.intro (fun hts => absurd (hts ▸ hsr ▸ hts) (of_eq_false h))
+                          (fun htr => absurd (htr ▸ Eq.symm (hsr ▸ htr)) (of_eq_false h)))
+    (fun hnsr => propext ⟨(absurd · hnsr.left), (absurd · hnsr.right)⟩)
+
+theorem eq_ite_lift : (ite c t s = r) = (ite c (t = r) (s = r)) := h.byCases
+  (fun hc => if_pos hc ▸ if_pos hc ▸ rfl)
+  (fun hnc => if_neg hnc ▸ if_neg hnc ▸ rfl)
 
 theorem distinct_binary_elim : (t ≠ s) = ¬(t = s) := rfl
 
